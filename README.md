@@ -1,60 +1,48 @@
-🔊 Electron P2P Voice Chat
+# Electron P2P Voice Chat
 
-Bu proje, WebRTC ve WebSocket kullanarak insanların sesli sohbet edebildiği basit bir masaüstü uygulaması. Electron üzerinde çalışıyor ve yerel ağda ya da internet üzerinden düşük gecikmeli P2P (eşler arası) ses aktarımı yapıyor.
+Bu proje, WebRTC ve WebSocket kullanarak insanların sesli sohbet edebildiği basit bir masaüstü uygulamasıdır. Electron üzerinde çalışır ve yerel ağda ya da internet üzerinden düşük gecikmeli P2P (eşler arası) ses aktarımı yapar.
 
-Özellikler
+## Özellikler
+- P2P ses iletimi (sunucuya yük binmez)
+- Mikrofon ve hoparlör cihazlarını seçebilme
+- Mikrofon hassasiyeti (gain) ve genel ses seviyesi ayarı
+- Mikrofon kapatma (Mute) ve sesi tamamen susturma (Deafen)
+- Karanlık / aydınlık tema desteği
+- Bağlı kullanıcı listesi ve konuşma göstergesi (visualizer)
+- Sade ve anlaşılır arayüz
 
-P2P ses iletimi (sunucuya yük binmez)
+## Kullanılan Teknolojiler
+- Electron  
+- HTML / CSS / JavaScript  
+- Simple-Peer (WebRTC)  
+- Python WebSocket sinyal sunucusu  
 
-Mikrofon ve hoparlör cihazlarını seçebilme
+## Nasıl Çalıştırılır
 
-Mikrofon hassasiyeti ve genel ses seviyesi ayarı
-
-Mikrofon kapatma (Mute) ve sesi tamamen susturma (Deafen)
-
-Karanlık / aydınlık tema
-
-Bağlı kullanıcı listesini ve konuşma durumlarını (visualizer) gösterme
-
-Günlük kullanım için sade ve anlaşılır bir sesli sohbet uygulaması.
-
-Kullanılan Teknolojiler
-
-Electron
-
-HTML / CSS / JavaScript
-
-Simple-Peer (WebRTC)
-
-Python WebSocket sinyal sunucusu
-
-Nasıl Çalıştırılır?
-
-Gerekli paketleri kur:
-
+### 1. Gereksinimleri kur
+```bash
 cd app
 npm install
+```
 
-
-Sinyal sunucusunu başlat:
-
+### 2. Sinyal sunucusunu başlat
+```bash
 python server/server.py
+```
 
-
-Uygulamayı çalıştır:
-
+### 3. Uygulamayı çalıştır
+```bash
 cd app
 npm start
+```
 
-
-Kurulum dosyası (.exe) oluşturmak istersen:
-
+### 4. Kurulum dosyası (.exe) oluşturmak istersen
+```bash
 npm run dist
+```
 
-Notlar
+## Notlar
+Bu uygulama farklı ağlar üzerinden de kullanılabilir. Bunun için sinyal sunucusunu bir bulut platformuna taşıyabilir veya Ngrok gibi araçlarla dış erişime açabilirsin.  
+Ayrıca projede Google STUN sunucuları tanımlı olduğu için NAT arkasından bağlantılar da sorunsuz şekilde çalışır.
 
-Farklı ağlardan bağlanmak için Ngrok kullanabilir veya sunucuyu bir bulut servisine koyabilirsin.
-
-İçeride Google STUN sunucuları tanımlıdır, bu yüzden NAT arkasında da çalışır.
-
-Bu projeyi yaparken hem ChatGPT hem Google Gemini’den yardım aldım. Tasarımı, yapıyı ve kodları onlarla birlikte şekillendirdim.
+Bu projeyi yaparken ChatGPT ve Google Gemini'den çokça destek aldım. Kodların çoğunu birlikte düşünerek, bazılarını da doğrudan onların yardımıyla yazdım.
