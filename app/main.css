@@ -1,8 +1,9 @@
-/* app/main.css - KOMPAKT & SCROLL FIX */
+/* app/main.css - SON, TEMİZ SPLIT SCREEN DÜZENİ */
 
 :root {
     --bg-body: #121212;
-    --bg-container: #1e1e1e;
+    --bg-sidebar: #1e1e1e;
+    --bg-chat: #181818;
     --text-main: #e0e0e0;
     --text-muted: #aaaaaa;
     --border-color: #333333;
@@ -10,13 +11,11 @@
     --input-bg: #2d2d2d;
     --input-border: #444444;
     
+    --msg-sent: #2196F3;
+    --msg-received: #333333;
+    
     --status-bg: #152436;
     --status-text: #64b5f6;
-    
-    --card-bg: #252525;
-    --card-shadow: rgba(0,0,0,0.3);
-    
-    --settings-bg: #252525;
     
     --btn-primary: #2196F3;
     --btn-primary-hover: #1976D2;
@@ -28,157 +27,153 @@
 
 body.light-theme {
     --bg-body: #f0f0f0;
-    --bg-container: #ffffff;
+    --bg-sidebar: #ffffff;
+    --bg-chat: #f5f5f5;
     --text-main: #333333;
     --text-muted: #666666;
-    --border-color: #eeeeee;
+    --border-color: #dddddd;
     
     --input-bg: #ffffff;
-    --input-border: #dddddd;
+    --input-border: #cccccc;
+    
+    --msg-sent: #2196F3;
+    --msg-received: #e0e0e0;
     
     --status-bg: #e3f2fd;
     --status-text: #0d47a1;
-    
-    --card-bg: #ffffff;
-    --card-shadow: rgba(0,0,0,0.05);
-    
-    --settings-bg: #f9f9f9;
     
     --user-connected: #e8f5e9;
     --user-connecting: #fff3e0;
 }
 
-/* GENEL DÜZEN (SCROLL FIX BURADA) */
+/* --- ANA YAPI --- */
 body { 
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
     background: var(--bg-body); 
     color: var(--text-main); 
-    height: 100vh; /* Ekranı tam kapla */
-    overflow: hidden; /* Ana sayfa asla kaymasın */
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    height: 100vh; 
+    overflow: hidden; 
+    display: flex; /* YATAY DİZİLİMİ AÇAR */
 }
 
-.container { 
-    width: 100%;
-    height: 100vh; /* Tam yükseklik */
-    max-width: 100%; /* Genişlik kısıtlamasını main.js'ten yapacağız */
-    background: var(--bg-container); 
+/* --- SOL PANEL (SIDEBAR - Sabit Genişlik) --- */
+.sidebar {
+    width: 350px; /* Kullanıcının istediği boyut */
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-color);
     display: flex;
-    flex-direction: column; /* Dikey dizilim */
-    padding: 15px;
+    flex-direction: column;
+    padding: 10px; /* Kullanıcının istediği padding */
     box-sizing: border-box;
+    flex-shrink: 0;
+    height: 100%;
 }
 
-/* ÜST KISIMLAR (SABİT) */
-.header-row {
+/* --- SAĞ PANEL (CHAT ALANI) --- */
+.chat-area {
+    flex: 1; /* Kalan tüm alanı kapla */
+    background: var(--bg-chat);
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    flex-shrink: 0; /* Küçülmesine izin verme */
+    flex-direction: column;
 }
 
-h1 { margin: 0; font-size: 20px; }
-
-#btnTheme {
-    background: transparent;
-    border: 1px solid var(--border-color);
-    color: var(--text-main);
-    cursor: pointer;
-    border-radius: 50%;
-    
-    /* YENİ EKLENEN KRİTİK SATIRLAR */
-    flex: none;        /* Flex 1 özelliğini iptal et (Uzamayı engeller) */
-    -webkit-app-region: no-drag; /* Sürüklemeyi engelle (Windows barındaysa) */
-    
-    /* BOYUT AYARLARI */
-    width: 32px;       /* Genişlik */
-    height: 32px;      /* Yükseklik */
-    padding: 0;        /* İç boşluğu sıfırla */
-    min-width: 32px;   /* Asla 32px'den küçük olma */
-    
-    /* MERKEZLEME */
+/* Chat Mesaj Geçmişi Kısmı */
+#chatHistory {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    
-    font-size: 16px;
-    transition: all 0.2s;
-    margin-left: 10px; /* Başlıktan biraz uzaklaşsın */
+    flex-direction: column;
+    gap: 8px;
 }
 
-#btnTheme:hover {
-    background: var(--border-color);
-    transform: scale(1.1);
-}
-
-#status { 
-    padding: 8px; margin-bottom: 10px; border-radius: 6px; 
-    background: var(--status-bg); color: var(--status-text); 
-    font-size: 13px; font-weight: 600; text-align: center;
+/* Chat Input Kısmı */
+.chat-input-container {
+    padding: 10px;
+    background: var(--bg-sidebar); 
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 8px;
     flex-shrink: 0;
 }
+
+#msgInput { flex: 1; padding: 8px; border-radius: 16px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); outline: none; }
+/* app/main.css dosyasında #btnSend bloğunu bul ve değiştir */
+#btnSend { 
+    width: 38px;             /* Butonun genişliğini daralttık */
+    height: 30px;            /* Yüksekliğini de aynı yaptık (Kare görünüm) */
+    padding: 0;              /* Padding'i sıfırladık */
+    font-size: 20px;         /* İkon büyük ve görünür olsun */
+    flex: none;
+    overflow: hidden;
+    /* İkonu ortalamak için flex kullanıyoruz */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    flex-shrink: 0;          /* Küçülmesini engelle */
+    background: var(--btn-primary); 
+    color: white; 
+    border: none; 
+    cursor: pointer;
+    border-radius: 16px; 
+}
+/* --- MESAJ BALONLARI --- */
+.message {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    word-wrap: break-word;
+}
+.message.sent { align-self: flex-end; background: var(--msg-sent); color: white; border-bottom-right-radius: 2px; }
+.message.received { align-self: flex-start; background: var(--msg-received); color: var(--text-main); border-bottom-left-radius: 2px; }
+.msg-sender { font-size: 10px; opacity: 0.7; margin-bottom: 2px; display: block; }
+.msg-time { font-size: 10px; opacity: 0.5; float: right; margin-left: 5px; margin-top: 5px; }
+
+
+/* --- SOL PANEL ORTAK ELEMENTLER --- */
+.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0; }
+h1 { margin: 0; font-size: 20px; }
+#btnTheme { flex: none; width: 32px; height: 32px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; background: transparent; border: 1px solid var(--border-color); color: var(--text-main); margin-left: 10px; }
+
+#status { padding: 8px; margin-bottom: 10px; border-radius: 6px; background: var(--status-bg); color: var(--status-text); font-size: 13px; font-weight: 600; text-align: center; flex-shrink: 0; }
 
 .input-group { margin-bottom: 10px; flex-shrink: 0; }
-input[type="text"] { 
-    padding: 8px; width: 100%; box-sizing: border-box;
-    border: 1px solid var(--input-border); background: var(--input-bg);
-    color: var(--text-main); border-radius: 6px; outline: none;
-}
+input[type="text"] { padding: 8px; width: 100%; box-sizing: border-box; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); border-radius: 6px; outline: none; }
 
-/* AYARLAR PANELİ (SABİT) */
-#settingsPanel {
-    background: var(--settings-bg) !important;
-    border: 1px solid var(--border-color) !important;
-    padding: 10px; border-radius: 8px; margin-bottom: 10px;
-    flex-shrink: 0;
-}
+#settingsPanel { background: var(--input-bg); border: 1px solid var(--border-color); padding: 10px; border-radius: 8px; margin-bottom: 10px; flex-shrink: 0; }
 
-.controls { 
-    display: flex; gap: 5px; margin-bottom: 10px; flex-shrink: 0; 
-}
-
-button { 
-    padding: 8px; cursor: pointer; border: none; border-radius: 6px; 
-    font-size: 13px; font-weight: 600; color: var(--btn-text); flex: 1;
-}
+.controls { display: flex; gap: 5px; margin-bottom: 10px; flex-shrink: 0; }
+button { padding: 8px; cursor: pointer; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--btn-text); flex: 1; }
 #btnConnect { background: var(--btn-primary); }
 #btnDisconnect { background: #f44336; display: none; }
 #btnToggleMic, #btnToggleSound { background: #2ecc71; } 
-
 .audio-controls { display: none; gap: 5px; width: 100%; }
 
-/* ALT KISIM (KAYDIRILABİLİR LİSTE) */
-#users {
-    flex: 1; /* Kalan tüm boşluğu kapla */
-    overflow-y: auto; /* Sadece burası kaysın */
-    margin-top: 5px;
-    padding-right: 5px; /* Scrollbar için boşluk */
-    border-top: 1px solid var(--border-color);
-    padding-top: 10px;
-}
-
-/* Scrollbar Tasarımı */
-#users::-webkit-scrollbar { width: 6px; }
-#users::-webkit-scrollbar-track { background: transparent; }
-#users::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
-#users::-webkit-scrollbar-thumb:hover { background: #777; }
-
-/* KART TASARIMLARI */
-.user-card { 
-    background: var(--card-bg); padding: 10px; margin-bottom: 8px; 
-    border-radius: 6px; border: 1px solid var(--border-color); 
-}
+/* KULLANICI LİSTESİ */
+#users { flex: 1; overflow-y: auto; margin-top: 5px; border-top: 1px solid var(--border-color); padding-top: 10px; }
+.user-card { background: var(--input-bg); padding: 8px; margin-bottom: 6px; border-radius: 6px; border: 1px solid var(--border-color); }
 .user-info { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
 .meter-bg { width: 100%; height: 4px; background: var(--border-color); border-radius: 2px; overflow: hidden; }
 .meter-fill { height: 100%; width: 0%; background: #2ecc71; transition: width 0.05s; }
 
-/* Helper Classes */
-.slider-group { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.slider-group:last-child { margin-bottom: 0; }
-.slider-group label { font-size: 12px; width: 70px; }
-.device-select { padding: 4px; font-size: 12px; width: 100%; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--input-border); }
+/* --- SLIDER / DROPDOWN FIX AYARLARI --- */
+.slider-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+
+.slider-group label { 
+    font-size: 12px; 
+    width: 60px; /* Etiket genişliğini minimuma indirdik */
+    flex-shrink: 0;
+}
+
+/* DROPDOWN TAŞMA ÇÖZÜMÜ (EN KRİTİK KISIM) */
+.device-select { 
+    flex: 1 1 auto; /* Seçim kutusuna maksimum alan tanı */
+    font-size: 12px;
+    min-width: 0; /* Flex item'ın kendi minimum genişliğini 0'a çek */
+    overflow: hidden; /* Taşmayı gizle */
+    text-overflow: ellipsis; /* Uzun metinler için üç nokta göster */
+    white-space: nowrap; /* Metni tek satırda tut */
+}

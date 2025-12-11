@@ -6,8 +6,8 @@
     <title>Electron P2P Voice Chat</title>
     <link rel="stylesheet" href="main.css">
     <style>
-        /* Slider stilleri */
-        .slider-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; width: 100%; }
+        /* Slider stilleri (Önceki stille aynı kalır) */
+        .slider-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; width: 100%; }
         .slider-group label { font-size: 14px; font-weight: bold; width: 100px; color: var(--text-main); }
         .slider-group input { flex: 1; cursor: pointer; }
         .slider-val { font-size: 12px; width: 35px; text-align: right; font-family: monospace; color: var(--text-muted); }
@@ -25,6 +25,7 @@
             color: var(--text-main);
             outline: none;
             max-width: 100%;
+            font-size: 14px;
         }
         
         /* Ayrıl Butonu (Kırmızı) */
@@ -35,13 +36,18 @@
             display: none; /* Başlangıçta gizli */
         }
         #btnDisconnect:hover { background: #d32f2f; }
+        
+        /* Scrollbar Düzeltmesi (Sadece kaydırılabilir alanlar için) */
+        #users::-webkit-scrollbar, #chatHistory::-webkit-scrollbar { width: 6px; }
+        #users::-webkit-scrollbar-thumb, #chatHistory::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        #users::-webkit-scrollbar-thumb:hover, #chatHistory::-webkit-scrollbar-thumb:hover { background: #777; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="sidebar">
     <div class="header-row">
-        <h1>GAZMA SAHİBİYİM ⛏️</h1>
+        <h1>GAZMA SAHİBİYİM ⛏️</h1> 
         <button id="btnTheme" title="Temayı Değiştir">☀️</button>
     </div>
 
@@ -51,22 +57,19 @@
         <input type="text" id="username" placeholder="Kullanıcı Adınız">
     </div>
 
-    <div id="settingsPanel" style="padding:10px; border-radius:8px; margin-bottom:15px; border:1px solid #eee;">
-        
+    <div id="settingsPanel">
         <div class="slider-group">
             <label>🎤 Giriş:</label>
             <select id="micSelect" class="device-select">
                 <option value="">Varsayılan Mikrofon</option>
             </select>
         </div>
-
-        <div class="slider-group" style="margin-bottom: 15px;">
+        <div class="slider-group">
             <label>🎧 Çıkış:</label>
             <select id="speakerSelect" class="device-select">
                 <option value="">Varsayılan Hoparlör</option>
             </select>
         </div>
-
         <div class="slider-group">
             <label>🎙️ Mic Ses:</label>
             <input type="range" id="micVolume" min="0" max="200" value="100">
@@ -81,7 +84,8 @@
     
     <div class="controls">
         <button id="btnConnect">Sohbete Katıl</button>
-        <button id="btnDisconnect">Odadan Ayrıl</button> <div class="audio-controls" id="audioControls">
+        <button id="btnDisconnect">Odadan Ayrıl</button>
+        <div class="audio-controls" id="audioControls">
             <button id="btnToggleMic">🎤 Mikrofon Açık</button>
             <button id="btnToggleSound">🔊 Ses Duyuluyor</button>
         </div>
@@ -90,8 +94,21 @@
     <div id="error-log"></div>
 
     <div id="users">
-        <h3 style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; color: var(--text-main);">Bağlı Kullanıcılar</h3>
+        <h3 style="border-bottom: 1px solid var(--border-color); padding-bottom: 5px; color: var(--text-main); font-size:16px;">Bağlı Kullanıcılar</h3>
         <div id="userList"></div>
+    </div>
+</div>
+
+<div class="chat-area">
+    <div id="chatHistory">
+        <div class="message received" style="align-self:center; background:var(--input-bg); border-bottom-left-radius: 12px; margin-top: auto;">
+            Odaya hoş geldiniz!
+        </div>
+    </div>
+    
+    <div class="chat-input-container">
+        <input type="text" id="msgInput" placeholder="Bir mesaj yaz..." disabled>
+        <button id="btnSend" disabled>></button>
     </div>
 </div>
 

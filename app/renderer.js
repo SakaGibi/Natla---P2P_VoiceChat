@@ -2,7 +2,11 @@
 
 const PORT = 8080;
 const WS_URL = `ws://localhost:${PORT}`; 
-// const WS_URL = `wss://SENIN-NGROK-ADRESIN.ngrok-free.app`; 
+const joinSound = new Audio('assets/gazmaliyim.mp3');
+joinSound.volume = 0.2;
+const chatHistory = document.getElementById('chatHistory');
+const msgInput = document.getElementById('msgInput');
+const btnSend = document.getElementById('btnSend');
 
 let socket;
 let localStream;      
@@ -249,6 +253,8 @@ btnConnect.addEventListener('click', async () => {
         statusDiv.innerText = "Sunucuya bağlanılıyor...";
         
         audioControls.style.display = 'flex';
+        msgInput.disabled = false;
+        btnSend.disabled = false;
         
         userNames["me"] = name + " (Ben)";
         addUserUI("me", userNames["me"], true);
@@ -261,6 +267,14 @@ btnConnect.addEventListener('click', async () => {
         disconnectRoom(); // Hata olursa sıfırla
         statusDiv.innerText = "HATA: " + err.message;
     }
+});
+
+// Gönder butonuna tıklandığında
+btnSend.addEventListener('click', sendChat);
+
+// Mesaj input alanında Enter'a basıldığında
+msgInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChat();
 });
 
 // --- ODADAN AYRILMA (DISCONNECT) ---
@@ -298,10 +312,52 @@ function disconnectRoom() {
     btnDisconnect.style.display = 'none';
     audioControls.style.display = 'none';
     inputUsername.disabled = false;
+    msgInput.disabled = true;
+    btnSend.disabled = true;
     
     statusDiv.innerText = "Odan ayrıldınız. Hazır...";
 }
 
+// --- CHAT FONKSİYONLARI ---
+
+// Gelen mesajı ekrana basar (UI Helper)
+function addMessageToUI(sender, text, type, time = null) {
+    if (!time) time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    const cleanName = sender.replace(" (Ben)", "");
+    
+    const div = document.createElement('div');
+    div.className = `message ${type}`;
+    div.innerHTML = `<span class="msg-sender">${cleanName}</span>${text}<span class="msg-time">${time}</span>`;
+    
+    chatHistory.appendChild(div);
+    chatHistory.scrollTop = chatHistory.scrollHeight; // Yeni mesajda aşağı kaydır
+}
+
+// Mesajı P2P ile gönderir
+function sendChat() {
+    const text = msgInput.value.trim();
+    if (!text || !isConnected) return;
+
+    // 1. Kendi ekranımıza ekle
+    addMessageToUI(userNames['me'], text, 'sent');
+
+    // 2. JSON paketi hazırla
+    const payload = JSON.stringify({
+        type: 'chat',
+        sender: userNames['me'],
+        text: text,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    });
+
+    // 3. Tüm bağlı peer'lara gönder
+    for (let id in peers) {
+        try {
+            peers[id].send(payload);
+        } catch (e) { console.error("Mesaj gönderilemedi:", e); }
+    }
+
+    msgInput.value = '';
+}
 
 // --- SES KONTROLLERİ ---
 function setMicState(mute) {
@@ -369,6 +425,9 @@ function connectSocket(name) {
                 onlineUserCount++; // Sayıyı artır
                 userNames[data.id] = data.name;
                 updateNameUI(data.id, data.name);
+
+                // Bildirim sesi çal
+                joinSound.play().catch(e => console.log("Ses çalma hatası (otomatik oynatma izni gerekebilir):", e));                
                 
                 // Geçici mesajı göster (3 saniye sonra sayıya döner)
                 showTemporaryStatus(`${data.name} katıldı 👋`);
@@ -419,6 +478,19 @@ function createPeer(targetId, name, initiator) {
             const finalName = userNames[targetId] || name || "Bilinmeyen";
             addUserUI(targetId, finalName, true);
             attachVisualizer(stream, targetId);
+        });
+
+        peer.on('data', data => {
+            try {
+                // Gelen veriyi stringe çevirip JSON'a parse et
+                const strData = new TextDecoder("utf-8").decode(data);
+                const msg = JSON.parse(strData);
+        
+                if (msg.type === 'chat') {
+                    // Sadece chat mesajlarını ekrana bas
+                    addMessageToUI(msg.sender, msg.text, 'received', msg.time);
+                }
+            } catch (e) { console.error("Gelen P2P Data hatası:", e); }
         });
 
         peer.on('close', () => removePeer(targetId));
