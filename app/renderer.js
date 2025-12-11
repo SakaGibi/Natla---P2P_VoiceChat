@@ -17,6 +17,24 @@ let isMicMuted = false;
 let isDeafened = false;
 let isConnected = false;
 
+// --- YENİ EKLENECEK GLOBAL DEĞİŞKENLER ---
+let statusTimeout;       // Zamanlayıcıyı tutmak için
+let onlineUserCount = 0; // Kişi sayısını hafızada tutmak için
+
+// --- YENİ YARDIMCI FONKSİYON ---
+// Bu fonksiyon mesajı gösterir, 3 saniye sonra kişi sayısına döner
+function showTemporaryStatus(message) {
+    statusDiv.innerText = message;
+    
+    // Eğer önceden ayarlanmış bir sayaç varsa iptal et (üst üste binmesin)
+    if (statusTimeout) clearTimeout(statusTimeout);
+
+    // 3 saniye (3000 ms) sonra varsayılan metne dön
+    statusTimeout = setTimeout(() => {
+        statusDiv.innerText = `Sohbet Odası (${onlineUserCount} Kişi)`;
+    }, 3000);
+}
+
 // UI
 const inputUsername = document.getElementById('username');
 const statusDiv = document.getElementById('status');
@@ -322,6 +340,7 @@ btnToggleSound.addEventListener('click', () => {
 });
 
 // --- WEBSOCKET ---
+// --- WEBSOCKET FONKSİYONU GÜNCELLENMİŞ HALİ ---
 function connectSocket(name) {
     socket = new WebSocket(WS_URL);
 
@@ -333,25 +352,47 @@ function connectSocket(name) {
     socket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
+            
             if (data.type === 'user-list') {
-                statusDiv.innerText = `Sohbet Odası (${data.users.length + 1} Kişi)`;
+                // 1. LİSTE GELDİĞİNDE (BAŞLANGIÇ)
+                // Kendimiz (+1) dahil toplam sayıyı kaydet
+                onlineUserCount = data.users.length + 1; 
+                statusDiv.innerText = `Sohbet Odası (${onlineUserCount} Kişi)`;
+                
                 data.users.forEach(user => {
                     userNames[user.id] = user.name;
                     createPeer(user.id, user.name, true);
                 });
             } 
             else if (data.type === 'user-joined') {
-                statusDiv.innerText = `${data.name} katıldı.`;
+                // 2. BİRİ KATILDIĞINDA
+                onlineUserCount++; // Sayıyı artır
                 userNames[data.id] = data.name;
                 updateNameUI(data.id, data.name);
+                
+                // Geçici mesajı göster (3 saniye sonra sayıya döner)
+                showTemporaryStatus(`${data.name} katıldı 👋`);
             } 
+            else if (data.type === 'user-left') {
+                // 3. BİRİ AYRILDIĞINDA
+                if (peers[data.id]) { // Sadece bizde ekliyse düşelim (Hata önlemi)
+                    onlineUserCount--; // Sayıyı azalt
+                }
+                
+                // İsmi al (yoksa 'Biri')
+                const leaverName = userNames[data.id] || "Biri";
+                removePeer(data.id);
+                
+                // Geçici mesajı göster
+                showTemporaryStatus(`${leaverName} ayrıldı 💨`);
+            }
             else if (data.type === 'signal') handleSignal(data.senderId, data.signal);
-            else if (data.type === 'user-left') removePeer(data.id);
         } catch (e) { console.error(e); }
     };
+    
     socket.onerror = () => {
         statusDiv.innerText = "Sunucu Bağlantı Hatası!";
-        disconnectRoom(); // Hata varsa resetle
+        disconnectRoom();
     };
     socket.onclose = () => {
          if(isConnected) disconnectRoom();
