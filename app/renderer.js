@@ -1,33 +1,35 @@
 // app/renderer.js
 
-// --- GLOBAL DEĞİŞKENLER ---
 const PORT = 8080;
-// Ngrok veya Localhost ayarını buradan yapabilirsin
-// const WS_URL = `wss://SENIN-NGROK-ADRESIN.ngrok-free.app`; 
 const WS_URL = `ws://localhost:${PORT}`; 
+// const WS_URL = `wss://SENIN-NGROK-ADRESIN.ngrok-free.app`; 
 
 let socket;
 let localStream;      
 let processedStream;  
-let micGainNode;      
+let micGainNode;
+let sourceNode; // Canlı değişim için kaynak düğümünü tutmamız lazım
 let audioContext;     
 
 let peers = {}; 
 let userNames = {};
 let isMicMuted = false;
 let isDeafened = false;
+let isConnected = false;
 
-// UI Elementleri
+// UI
 const inputUsername = document.getElementById('username');
 const statusDiv = document.getElementById('status');
 const userListDiv = document.getElementById('userList');
 const btnConnect = document.getElementById('btnConnect');
+const btnDisconnect = document.getElementById('btnDisconnect');
 const btnToggleMic = document.getElementById('btnToggleMic');
 const btnToggleSound = document.getElementById('btnToggleSound');
 const audioControls = document.getElementById('audioControls');
 const btnTheme = document.getElementById('btnTheme');
 
-const micSelect = document.getElementById('micSelect'); // YENİ
+const micSelect = document.getElementById('micSelect');
+const speakerSelect = document.getElementById('speakerSelect'); // YENİ
 const micSlider = document.getElementById('micVolume');
 const micVal = document.getElementById('micVal');
 const masterSlider = document.getElementById('masterVolume');
@@ -35,77 +37,131 @@ const masterVal = document.getElementById('masterVal');
 
 // --- BAŞLANGIÇ ---
 window.onload = () => {
-    if (!window.SimplePeer) document.getElementById('error-log').innerText = "HATA: SimplePeer yüklenemedi. Preload ayarlarını kontrol et.";
+    if (!window.SimplePeer) document.getElementById('error-log').innerText = "HATA: SimplePeer yüklenemedi.";
     loadSettings();
-    getMicrophones(); // YENİ: Mikrofonları listele
-    console.log("✅ Renderer.js yüklendi ve hazır.");
+    getDevices(); // Hem mic hem speaker
 };
 
-// --- YENİ: MİKROFONLARI LİSTELEME ---
-async function getMicrophones() {
+// --- CİHAZLARI LİSTELE (GİRİŞ VE ÇIKIŞ) ---
+async function getDevices() {
     try {
-        // İsimleri görebilmek için önce izin isteyip kapatıyoruz
-        const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        tempStream.getTracks().forEach(track => track.stop());
-
+        await navigator.mediaDevices.getUserMedia({ audio: true }); // İzin tetikle
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const audioInputs = devices.filter(device => device.kind === 'audioinput');
-
-        micSelect.innerHTML = ''; // Temizle
         
-        // Varsayılan seçenek
-        const defaultOpt = document.createElement('option');
-        defaultOpt.value = "";
-        defaultOpt.text = "Varsayılan Mikrofon";
-        micSelect.appendChild(defaultOpt);
+        const audioInputs = devices.filter(d => d.kind === 'audioinput');
+        const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
 
-        audioInputs.forEach(device => {
-            const option = document.createElement('option');
-            option.value = device.deviceId;
-            // Eğer etiketi boşsa 'Mikrofon 1, 2' diye adlandır
-            option.text = device.label || `Mikrofon ${micSelect.length}`;
-            micSelect.appendChild(option);
+        // Mikrofonları Doldur
+        micSelect.innerHTML = '<option value="">Varsayılan Mikrofon</option>';
+        audioInputs.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.deviceId;
+            opt.text = d.label || `Mikrofon ${micSelect.length}`;
+            micSelect.appendChild(opt);
         });
 
-        // Kayıtlı mikrofonu geri seç
-        const savedMicId = localStorage.getItem('selectedMicId');
-        if (savedMicId) {
-            // Eğer kayıtlı mikrofon hala takılıysa onu seç
-            const exists = audioInputs.some(d => d.deviceId === savedMicId);
-            if (exists) micSelect.value = savedMicId;
+        // Hoparlörleri Doldur
+        speakerSelect.innerHTML = '<option value="">Varsayılan Hoparlör</option>';
+        audioOutputs.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.deviceId;
+            opt.text = d.label || `Hoparlör ${speakerSelect.length}`;
+            speakerSelect.appendChild(opt);
+        });
+
+        // Kayıtlı Ayarları Geri Yükle
+        const savedMic = localStorage.getItem('selectedMicId');
+        if (savedMic && audioInputs.some(d => d.deviceId === savedMic)) micSelect.value = savedMic;
+
+        const savedSpeaker = localStorage.getItem('selectedSpeakerId');
+        if (savedSpeaker && audioOutputs.some(d => d.deviceId === savedSpeaker)) speakerSelect.value = savedSpeaker;
+
+    } catch (err) { console.error(err); }
+}
+
+// --- CANLI CİHAZ DEĞİŞİMLERİ ---
+
+// 1. MİKROFON DEĞİŞİMİ (EN ZOR KISIM)
+micSelect.addEventListener('change', async (e) => {
+    saveSetting('selectedMicId', e.target.value);
+    
+    // Eğer sohbete bağlıysak canlı değişim yap (Hot Swap)
+    if (isConnected) {
+        console.log("Mikrofon canlı değiştiriliyor...");
+        await switchMicrophone(e.target.value);
+    }
+});
+
+async function switchMicrophone(deviceId) {
+    try {
+        // Eski akışı durdur
+        if (localStream) {
+            localStream.getTracks().forEach(t => t.stop());
         }
 
+        // Yeni akışı al
+        const constraints = {
+            audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+            video: false
+        };
+        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // AudioContext'teki kaynağı değiştir
+        // Önceki kaynağı kopar
+        if (sourceNode) sourceNode.disconnect();
+        
+        // Yeni kaynak oluştur ve GainNode'a bağla
+        sourceNode = audioContext.createMediaStreamSource(newStream);
+        sourceNode.connect(micGainNode); // GainNode zaten Destination'a bağlı, zincir tamam.
+        
+        // P2P Bağlantılarını Güncelle (ReplaceTrack)
+        // Karşı tarafa giden işlenmiş track'i bulmamız lazım. 
+        // processedStream (Destination) değişmedi ama içindeki veri değişti.
+        // Ancak SimplePeer'a "eski track yerine bunu kullan" dememiz gerekebilir.
+        
+        // NOT: AudioContext Destination stream'i otomatik güncellenir mi? Evet.
+        // Ama localStream referansını güncellemeliyiz ki "Mute" fonksiyonu çalışsın.
+        localStream = newStream;
+
+        // Mute durumu varsa yenisine de uygula
+        setMicState(isMicMuted);
+
     } catch (err) {
-        console.error("Mikrofon listesi hatası:", err);
+        console.error("Mikrofon değiştirilemedi:", err);
+        alert("Mikrofon değiştirilemedi: " + err.message);
     }
 }
 
-// Mikrofon değişince kaydet
-micSelect.addEventListener('change', (e) => {
-    saveSetting('selectedMicId', e.target.value);
+// 2. HOPARLÖR DEĞİŞİMİ
+speakerSelect.addEventListener('change', (e) => {
+    const deviceId = e.target.value;
+    saveSetting('selectedSpeakerId', deviceId);
+    changeOutputDevice(deviceId);
 });
 
-// --- LOCAL STORAGE & TEMA ---
-function saveSetting(key, value) {
-    localStorage.setItem(key, value);
+function changeOutputDevice(deviceId) {
+    // Sayfadaki tüm <audio> elementlerini bul ve çıkışını değiştir
+    document.querySelectorAll('audio').forEach(async (audio) => {
+        if (audio.setSinkId) {
+            try {
+                await audio.setSinkId(deviceId);
+            } catch (err) { console.error("Hoparlör değiştirilemedi:", err); }
+        }
+    });
 }
 
+// --- LOCAL STORAGE & TEMA ---
+function saveSetting(key, value) { localStorage.setItem(key, value); }
 function loadSettings() {
     const savedName = localStorage.getItem('username');
     if (savedName) inputUsername.value = savedName;
     else inputUsername.value = "User_" + Math.floor(Math.random() * 1000); 
 
     const savedMicVol = localStorage.getItem('micVolume');
-    if (savedMicVol) {
-        micSlider.value = savedMicVol;
-        micVal.innerText = savedMicVol + "%";
-    }
+    if (savedMicVol) { micSlider.value = savedMicVol; micVal.innerText = savedMicVol + "%"; }
 
     const savedMasterVol = localStorage.getItem('masterVolume');
-    if (savedMasterVol) {
-        masterSlider.value = savedMasterVol;
-        masterVal.innerText = savedMasterVol + "%";
-    }
+    if (savedMasterVol) { masterSlider.value = savedMasterVol; masterVal.innerText = savedMasterVol + "%"; }
 
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
@@ -115,14 +171,12 @@ function loadSettings() {
         btnTheme.innerText = '☀️';
     }
 }
-
 btnTheme.addEventListener('click', () => {
     document.body.classList.toggle('light-theme');
     const isLight = document.body.classList.contains('light-theme');
     btnTheme.innerText = isLight ? '🌙' : '☀️';
     saveSetting('theme', isLight ? 'light' : 'dark');
 });
-
 inputUsername.addEventListener('input', (e) => saveSetting('username', e.target.value));
 
 // --- SES AYARLARI ---
@@ -132,13 +186,10 @@ micSlider.addEventListener('input', (e) => {
     if (micGainNode) micGainNode.gain.value = val / 100; 
     saveSetting('micVolume', val); 
 });
-
 masterSlider.addEventListener('input', (e) => {
     const val = e.target.value;
     masterVal.innerText = val + "%";
-    document.querySelectorAll('audio').forEach(audio => {
-        audio.volume = val / 100;
-    });
+    document.querySelectorAll('audio').forEach(audio => audio.volume = val / 100);
     saveSetting('masterVolume', val); 
 });
 
@@ -146,16 +197,15 @@ masterSlider.addEventListener('input', (e) => {
 btnConnect.addEventListener('click', async () => {
     const name = inputUsername.value;
     if(!name) return alert("Lütfen bir isim girin!");
-    
     saveSetting('username', name);
 
-    btnConnect.disabled = true;
+    btnConnect.style.display = 'none'; // Bağlan butonunu gizle
+    btnDisconnect.style.display = 'flex'; // Ayrıl butonunu göster
+    
     inputUsername.disabled = true;
-    micSelect.disabled = true; // Bağlanınca seçimi kilitle
     
     statusDiv.innerText = "Ses motoru başlatılıyor...";
     try {
-        // --- YENİ: SEÇİLEN MİKROFONU KULLAN ---
         const selectedMicId = micSelect.value;
         const constraints = {
             audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true,
@@ -163,17 +213,16 @@ btnConnect.addEventListener('click', async () => {
         };
 
         const rawStream = await navigator.mediaDevices.getUserMedia(constraints);
-        // ----------------------------------------
         
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioContext.createMediaStreamSource(rawStream);
+        sourceNode = audioContext.createMediaStreamSource(rawStream);
         
         micGainNode = audioContext.createGain();
         micGainNode.gain.value = micSlider.value / 100; 
         
         const destination = audioContext.createMediaStreamDestination();
         
-        source.connect(micGainNode);
+        sourceNode.connect(micGainNode);
         micGainNode.connect(destination);
         
         localStream = rawStream; 
@@ -181,7 +230,6 @@ btnConnect.addEventListener('click', async () => {
 
         statusDiv.innerText = "Sunucuya bağlanılıyor...";
         
-        btnConnect.style.display = 'none';
         audioControls.style.display = 'flex';
         
         userNames["me"] = name + " (Ben)";
@@ -189,13 +237,53 @@ btnConnect.addEventListener('click', async () => {
         attachVisualizer(processedStream, "me"); 
 
         connectSocket(name);
+        isConnected = true;
     } catch (err) {
         console.error(err);
+        disconnectRoom(); // Hata olursa sıfırla
         statusDiv.innerText = "HATA: " + err.message;
-        btnConnect.disabled = false;
-        micSelect.disabled = false;
     }
 });
+
+// --- ODADAN AYRILMA (DISCONNECT) ---
+btnDisconnect.addEventListener('click', () => {
+    disconnectRoom();
+});
+
+function disconnectRoom() {
+    isConnected = false;
+    
+    // 1. Socket'i kapat
+    if (socket) {
+        socket.close();
+        socket = null;
+    }
+
+    // 2. Peer bağlantılarını kapat
+    for (let id in peers) {
+        peers[id].destroy();
+    }
+    peers = {};
+
+    // 3. Mikrofonu ve Ses Motorunu kapat
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    if (audioContext) audioContext.close();
+    localStream = null;
+    audioContext = null;
+
+    // 4. Arayüzü Temizle
+    document.getElementById('userList').innerHTML = ''; // Kullanıcı listesini sil
+    document.getElementById('audioContainer').innerHTML = ''; // Audio elementlerini sil
+    
+    // 5. Butonları Eski Haline Getir
+    btnConnect.style.display = 'flex';
+    btnDisconnect.style.display = 'none';
+    audioControls.style.display = 'none';
+    inputUsername.disabled = false;
+    
+    statusDiv.innerText = "Odan ayrıldınız. Hazır...";
+}
+
 
 // --- SES KONTROLLERİ ---
 function setMicState(mute) {
@@ -216,16 +304,13 @@ function setMicState(mute) {
         if(bar) bar.style.backgroundColor = "#2ecc71";
     }
 }
-
 btnToggleMic.addEventListener('click', () => {
     if (isDeafened) return alert("Hoparlör kapalıyken mikrofonu açamazsınız!");
     setMicState(!isMicMuted);
 });
-
 btnToggleSound.addEventListener('click', () => {
     isDeafened = !isDeafened;
     document.querySelectorAll('audio').forEach(audio => audio.muted = isDeafened);
-
     if (isDeafened) {
         btnToggleSound.innerText = "🔇 Ses Kapalı";
         btnToggleSound.style.backgroundColor = "#ff4757";
@@ -264,7 +349,13 @@ function connectSocket(name) {
             else if (data.type === 'user-left') removePeer(data.id);
         } catch (e) { console.error(e); }
     };
-    socket.onerror = () => statusDiv.innerText = "Sunucu Bağlantı Hatası!";
+    socket.onerror = () => {
+        statusDiv.innerText = "Sunucu Bağlantı Hatası!";
+        disconnectRoom(); // Hata varsa resetle
+    };
+    socket.onclose = () => {
+         if(isConnected) disconnectRoom();
+    };
 }
 
 // --- P2P ---
@@ -278,7 +369,8 @@ function createPeer(targetId, name, initiator) {
         });
 
         peer.on('signal', signal => {
-            socket.send(JSON.stringify({ type: 'signal', targetId: targetId, signal: signal }));
+            if(socket && socket.readyState === WebSocket.OPEN)
+                socket.send(JSON.stringify({ type: 'signal', targetId: targetId, signal: signal }));
         });
 
         peer.on('stream', stream => {
@@ -358,6 +450,8 @@ function updateNameUI(id, newName) {
 }
 
 function attachVisualizer(stream, id) {
+    // Görselleştirici için yeni bir context açmıyoruz, window.AudioContext veya mevcut olanı kullanıyoruz
+    // Ancak görselleştirici stream'den bağımsız çalışmalı.
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const source = audioCtx.createMediaStreamSource(stream);
     const analyser = audioCtx.createAnalyser();
@@ -368,13 +462,13 @@ function attachVisualizer(stream, id) {
     const barElement = document.getElementById(`meter-fill-${id}`);
 
     function updateMeter() {
-        if (!barElement) return; 
+        if (!document.getElementById(`user-${id}`)) return; // Eleman yoksa dur
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
         for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
         const average = sum / dataArray.length;
         const percent = Math.min(100, average * 2.5); 
-        barElement.style.width = percent + "%";
+        if(barElement) barElement.style.width = percent + "%";
         requestAnimationFrame(updateMeter);
     }
     updateMeter();
@@ -389,6 +483,12 @@ function addAudioElement(id, stream) {
     
     const masterVol = document.getElementById('masterVolume').value;
     audio.volume = masterVol / 100;
+
+    // Seçili hoparlörü uygula
+    const selectedSpeaker = document.getElementById('speakerSelect').value;
+    if (selectedSpeaker && audio.setSinkId) {
+        audio.setSinkId(selectedSpeaker).catch(e => console.error(e));
+    }
 
     if (isDeafened) audio.muted = true;
     document.getElementById('audioContainer').appendChild(audio);

@@ -4,22 +4,19 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' ws: blob:; style-src 'self' 'unsafe-inline';">
     <title>Electron P2P Voice Chat</title>
-    
     <link rel="stylesheet" href="main.css">
     <style>
-        /* Slider özel stilleri */
+        /* Slider stilleri */
         .slider-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; width: 100%; }
         .slider-group label { font-size: 14px; font-weight: bold; width: 100px; color: var(--text-main); }
         .slider-group input { flex: 1; cursor: pointer; }
         .slider-val { font-size: 12px; width: 35px; text-align: right; font-family: monospace; color: var(--text-muted); }
-        
-        /* Kullanıcı kartı stilleri */
         .user-volume { margin-top: 5px; display: flex; align-items: center; gap: 5px; font-size: 12px; }
         .user-volume input { flex: 1; height: 5px; cursor: pointer; }
         .user-volume span { font-size: 11px; width: 30px; text-align: right; color: var(--text-muted); }
-
-        /* Dropdown (Mikrofon Seçimi) Stili */
-        .mic-select {
+        
+        /* Dropdown Stili */
+        .device-select {
             flex: 1;
             padding: 5px;
             border-radius: 4px;
@@ -27,7 +24,17 @@
             background: var(--input-bg);
             color: var(--text-main);
             outline: none;
+            max-width: 100%;
         }
+        
+        /* Ayrıl Butonu (Kırmızı) */
+        #btnDisconnect {
+            background: #f44336;
+            width: 100%; 
+            justify-content: center;
+            display: none; /* Başlangıçta gizli */
+        }
+        #btnDisconnect:hover { background: #d32f2f; }
     </style>
 </head>
 <body>
@@ -46,10 +53,17 @@
 
     <div id="settingsPanel" style="padding:10px; border-radius:8px; margin-bottom:15px; border:1px solid #eee;">
         
-        <div class="slider-group" style="margin-bottom: 15px;">
-            <label>🎤 Cihaz:</label>
-            <select id="micSelect" class="mic-select">
+        <div class="slider-group">
+            <label>🎤 Giriş:</label>
+            <select id="micSelect" class="device-select">
                 <option value="">Varsayılan Mikrofon</option>
+            </select>
+        </div>
+
+        <div class="slider-group" style="margin-bottom: 15px;">
+            <label>🎧 Çıkış:</label>
+            <select id="speakerSelect" class="device-select">
+                <option value="">Varsayılan Hoparlör</option>
             </select>
         </div>
 
@@ -67,7 +81,7 @@
     
     <div class="controls">
         <button id="btnConnect">Sohbete Katıl</button>
-        <div class="audio-controls" id="audioControls">
+        <button id="btnDisconnect">Odadan Ayrıl</button> <div class="audio-controls" id="audioControls">
             <button id="btnToggleMic">🎤 Mikrofon Açık</button>
             <button id="btnToggleSound">🔊 Ses Duyuluyor</button>
         </div>
@@ -82,8 +96,6 @@
 </div>
 
 <div id="audioContainer"></div>
-
 <script src="renderer.js"></script>
-
 </body>
 </html>
