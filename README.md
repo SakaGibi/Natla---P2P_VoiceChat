@@ -4,19 +4,22 @@
 Bu proje, WebRTC ve WebSocket kullanarak insanların sesli sohbet edebildiği basit bir masaüstü uygulamasıdır. Electron üzerinde çalışır ve yerel ağda ya da internet üzerinden düşük gecikmeli P2P (eşler arası) ses aktarımı yapar.
 
 ## Özellikler
+- **Kalıcı Yazılı Sohbet (Text Chat):** Yan panelde sürekli açık duran metin sohbeti.
+- **P2P Veri Kanalları:** Yazılı mesajlar sunucuya uğramadan, direkt eşler arasında (P2P) şifreli iletilir.
+- **Oda Katılım Bildirimi:** Odaya yeni bir kullanıcı katıldığında sesli bildirim.
 - P2P ses iletimi (sunucuya yük binmez)
 - Mikrofon ve hoparlör cihazlarını seçebilme
-- Mikrofon hassasiyeti (gain) ve genel ses seviyesi ayarı
 - Mikrofon kapatma (Mute) ve sesi tamamen susturma (Deafen)
+- Mikrofon hassasiyeti (gain) ve genel ses seviyesi ayarı
 - Karanlık / aydınlık tema desteği
 - Bağlı kullanıcı listesi ve konuşma göstergesi (visualizer)
-- Sade ve anlaşılır arayüz
+- Sabit bölünmüş ekran (Sidebar + Chat Alanı) ile iyileştirilmiş arayüz.
 
 ## Kullanılan Teknolojiler
-- Electron  
-- HTML / CSS / JavaScript  
-- Simple-Peer (WebRTC)  
-- Python WebSocket sinyal sunucusu  
+- Electron  
+- HTML / CSS / JavaScript  
+- Simple-Peer (WebRTC)  
+- Python WebSocket sinyal sunucusu
 
 ## Nasıl Çalıştırılır
 
@@ -50,21 +53,24 @@ Bu projeyi yaparken ChatGPT ve Google Gemini'den çokça destek aldım. Kodları
 
 
 # EN
-This project is a simple desktop application that allows people to voice chat using WebRTC and WebSocket. It runs on Electron and performs low-latency P2P (peer-to-peer) audio transmission over a local network or the internet.
+This project is a simple desktop application that allows people to communicate using voice chat via WebRTC and WebSocket. It runs on Electron and performs low-latency P2P (peer-to-peer) audio transmission over a local network or the internet.
 
 ## Features
-- P2P audio transmission (reduces server load)
-- Ability to select microphone and speaker devices
-- Microphone sensitivity (gain) and master volume adjustment
-- Mute microphone and Deafen (mute all incoming sound)
-- Dark / Light theme support
-- Connected user list and voice visualizer
-- Simple and clean interface
+- **Persistent Text Chat:** Permanently displayed text chat in a split-screen side panel.
+- **P2P Data Channels:** Text messages are transmitted securely and directly between peers (P2P), bypassing the signaling server for message content.
+- **Room Join Notification:** An audible alert plays when a new user joins the room.
+- P2P audio transmission (zero load on the server for media streaming).
+- Ability to select microphone and speaker devices.
+- Microphone muting (Mute) and total audio suppression (Deafen).
+- Microphone sensitivity (gain) and master volume control.
+- Dark / light theme support.
+- Connected user list and voice indicator (visualizer).
+- Improved user interface with a permanent split-screen layout (Sidebar + Chat Area).
 
 ## Technologies Used
-- Electron
-- HTML / CSS / JavaScript
-- Simple-Peer (WebRTC)
+- Electron  
+- HTML / CSS / JavaScript  
+- Simple-Peer (WebRTC)  
 - Python WebSocket signaling server
 
 ## How to Run
