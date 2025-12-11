@@ -10,25 +10,29 @@
         .slider-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; width: 100%; }
         .slider-group label { font-size: 14px; font-weight: bold; width: 100px; }
         .slider-group input { flex: 1; cursor: pointer; }
-        .slider-val { font-size: 12px; width: 35px; text-align: right; font-family: monospace; }
+        .slider-val { font-size: 12px; width: 35px; text-align: right; font-family: monospace; color: var(--text-muted); }
         
         /* Kullanıcı kartındaki slider */
         .user-volume { margin-top: 5px; display: flex; align-items: center; gap: 5px; font-size: 12px; }
         .user-volume input { flex: 1; height: 5px; cursor: pointer; }
-        .user-volume span { font-size: 11px; width: 30px; text-align: right; color: #666; }
+        .user-volume span { font-size: 11px; width: 30px; text-align: right; color: var(--text-muted); }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🔊 P2P Sesli Sohbet</h1>
+    <div class="header-row">
+        <h1>🔊 P2P Sohbet</h1>
+        <button id="btnTheme" title="Temayı Değiştir">☀️</button>
+    </div>
+
     <div id="status">Hazır...</div>
     
     <div class="input-group">
-        <input type="text" id="username" placeholder="Kullanıcı Adınız" value="User">
+        <input type="text" id="username" placeholder="Kullanıcı Adınız">
     </div>
 
-    <div id="settingsPanel" style="background:#f9f9f9; padding:10px; border-radius:8px; margin-bottom:15px; border:1px solid #eee; display:none;">
+    <div id="settingsPanel" style="padding:10px; border-radius:8px; margin-bottom:15px; border:1px solid #eee;">
         <div class="slider-group">
             <label>🎙️ Mic Ses:</label>
             <input type="range" id="micVolume" min="0" max="200" value="100">
@@ -52,7 +56,7 @@
     <div id="error-log"></div>
 
     <div id="users">
-        <h3 style="border-bottom: 1px solid #eee; padding-bottom: 10px;">Bağlı Kullanıcılar</h3>
+        <h3 style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; color: var(--text-main);">Bağlı Kullanıcılar</h3>
         <div id="userList"></div>
     </div>
 </div>
@@ -62,12 +66,13 @@
 <script>
     window.onload = () => {
         if (!window.SimplePeer) document.getElementById('error-log').innerText = "HATA: SimplePeer yüklenemedi.";
+        loadSettings(); // AYARLARI GERİ YÜKLE
     };
 
     const PORT = 8080;
-    // DİKKAT: Ngrok kullanıyorsan burayı güncelle
     const WS_URL = `ws://localhost:${PORT}`; 
-    
+    // const WS_URL = `wss://SENIN-NGROK-ADRESIN.ngrok-free.app`; // Ngrok kullanırken bunu aç
+
     let socket;
     let localStream;      
     let processedStream;  
@@ -88,20 +93,68 @@
     const btnToggleSound = document.getElementById('btnToggleSound');
     const audioControls = document.getElementById('audioControls');
     const settingsPanel = document.getElementById('settingsPanel');
+    const btnTheme = document.getElementById('btnTheme');
     
-    // Slider Elementleri
     const micSlider = document.getElementById('micVolume');
     const micVal = document.getElementById('micVal');
     const masterSlider = document.getElementById('masterVolume');
     const masterVal = document.getElementById('masterVal');
 
-    inputUsername.value += "_" + Math.floor(Math.random() * 1000);
+    // --- LOCAL STORAGE & TEMA AYARLARI ---
+    
+    function saveSetting(key, value) {
+        localStorage.setItem(key, value);
+    }
+
+    function loadSettings() {
+        // 1. Kullanıcı Adı
+        const savedName = localStorage.getItem('username');
+        if (savedName) inputUsername.value = savedName;
+        else inputUsername.value = "User_" + Math.floor(Math.random() * 1000); 
+
+        // 2. Mikrofon Sesi
+        const savedMicVol = localStorage.getItem('micVolume');
+        if (savedMicVol) {
+            micSlider.value = savedMicVol;
+            micVal.innerText = savedMicVol + "%";
+        }
+
+        // 3. Genel Ses
+        const savedMasterVol = localStorage.getItem('masterVolume');
+        if (savedMasterVol) {
+            masterSlider.value = savedMasterVol;
+            masterVal.innerText = savedMasterVol + "%";
+        }
+
+        // 4. Tema (Varsayılan Dark, eğer 'light' kayıtlıysa sınıfı ekle)
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-theme');
+            btnTheme.innerText = '🌙'; // Buton "Karanlığa geç" gösterir
+        } else {
+            // Varsayılan zaten karanlık
+            btnTheme.innerText = '☀️'; // Buton "Aydınlığa geç" gösterir
+        }
+    }
+
+    // TEMA DEĞİŞTİRME BUTONU
+    btnTheme.addEventListener('click', () => {
+        document.body.classList.toggle('light-theme'); // Dark değil Light sınıfını aç/kapa
+        const isLight = document.body.classList.contains('light-theme');
+        
+        btnTheme.innerText = isLight ? '🌙' : '☀️';
+        saveSetting('theme', isLight ? 'light' : 'dark');
+    });
+
+    // İSİM DEĞİŞİNCE KAYDET
+    inputUsername.addEventListener('input', (e) => saveSetting('username', e.target.value));
 
     // --- SES AYARLARI MANTIĞI ---
     micSlider.addEventListener('input', (e) => {
         const val = e.target.value;
         micVal.innerText = val + "%";
         if (micGainNode) micGainNode.gain.value = val / 100; 
+        saveSetting('micVolume', val); 
     });
 
     masterSlider.addEventListener('input', (e) => {
@@ -110,11 +163,16 @@
         document.querySelectorAll('audio').forEach(audio => {
             audio.volume = val / 100;
         });
+        saveSetting('masterVolume', val); 
     });
 
     // --- BAĞLANMA İŞLEMİ ---
     btnConnect.addEventListener('click', async () => {
         const name = inputUsername.value;
+        if(!name) return alert("Lütfen bir isim girin!");
+        
+        saveSetting('username', name); 
+
         btnConnect.disabled = true;
         inputUsername.disabled = true;
         
@@ -126,7 +184,7 @@
             const source = audioContext.createMediaStreamSource(rawStream);
             
             micGainNode = audioContext.createGain();
-            micGainNode.gain.value = 1.0; 
+            micGainNode.gain.value = micSlider.value / 100; 
             
             const destination = audioContext.createMediaStreamDestination();
             
@@ -140,7 +198,6 @@
             
             btnConnect.style.display = 'none';
             audioControls.style.display = 'flex';
-            settingsPanel.style.display = 'block'; 
             
             userNames["me"] = name + " (Ben)";
             addUserUI("me", userNames["me"], true);
@@ -166,7 +223,7 @@
             btnToggleMic.innerText = "🔇 Mikrofon Kapalı";
             btnToggleMic.style.backgroundColor = "#ff4757";
             const bar = document.getElementById('meter-fill-me');
-            if(bar) bar.style.backgroundColor = "#ccc";
+            if(bar) bar.style.backgroundColor = "#555"; // Karanlık tema için gri
         } else {
             btnToggleMic.innerText = "🎤 Mikrofon Açık";
             btnToggleMic.style.backgroundColor = "#2ecc71";
@@ -277,9 +334,17 @@
             userListDiv.appendChild(el);
         }
         
-        el.style.backgroundColor = isConnected ? '#e8f5e9' : '#fff3e0';
+        // CSS Variable kullanarak arka plan rengi atama (JS içinde)
+        // Kartlara özel ID verdiğimiz için CSS variable'ları inline style olarak da verebiliriz
+        // ama temiz olsun diye renkleri CSS'ten yönettik. 
+        // Burada inline style ile background'ı ezmek yerine, 
+        // JS ile bir class ekleyip çıkarmak daha doğru olurdu ama 
+        // CSS'te --user-connected değişkeni tanımladık.
+        // Onu kullanalım:
         
-        // KİŞİYE ÖZEL SES AYARI + YÜZDE GÖSTERGESİ
+        const bgColor = isConnected ? 'var(--user-connected)' : 'var(--user-connecting)';
+        el.style.backgroundColor = bgColor;
+        
         let volumeControlHTML = '';
         if (id !== 'me') {
             volumeControlHTML = `
