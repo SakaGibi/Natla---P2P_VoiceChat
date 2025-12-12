@@ -9,7 +9,9 @@ const chatHistory = document.getElementById('chatHistory');
 const msgInput = document.getElementById('msgInput');
 const btnSend = document.getElementById('btnSend');
 const path = require('path');
-const joinSound = new Audio(path.join(__dirname, 'assets', 'gazmaliyim.mp3'));
+let joinPath = path.join(__dirname, 'assets', 'gazmaliyim.mp3');
+joinPath = joinPath.replace('app.asar', 'app.asar.unpacked');
+const joinSound = new Audio(joinPath);
 joinSound.volume = 0.2;
 
 
@@ -388,7 +390,11 @@ document.querySelectorAll('.soundpad-btn').forEach((btn, index) => {
 
 function playLocalSound(effectName) {
     try {
-        const soundPath = path.join(__dirname, 'assets', `${effectName}.mp3`);
+        // 1. Dosyanın normal yolunu al
+        let soundPath = path.join(__dirname, 'assets', `${effectName}.mp3`);
+        
+        // 2. KRİTİK NOKTA: Eğer uygulama exe olmuşsa, dosya yolunu "paketten çıkarılmış" klasöre yönlendir.
+        soundPath = soundPath.replace('app.asar', 'app.asar.unpacked');
         
         const audio = new Audio(soundPath); 
         const masterVol = document.getElementById('masterVolume').value;

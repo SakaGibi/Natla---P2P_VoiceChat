@@ -25,14 +25,12 @@
       "**/*",
       "!dist/*"
     ],
-    
     "asarUnpack": [
-      "app/assets/**/*" 
+      "assets/**/*"
     ],
-    
     "win": {
       "target": "nsis",
-      "icon": "app/assets/gazmaliyim.ico"
+      "icon": "assets/gazmaliyim.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -40,7 +38,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Natla"
+      "shortcutName": "Natla",
+      "installerIcon": "assets/gazmaliyim.ico",
+      "uninstallerIcon": "assets/gazmaliyim.ico"
     },
     "directories": {
       "output": "dist"
