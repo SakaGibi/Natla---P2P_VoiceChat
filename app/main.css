@@ -143,12 +143,63 @@ input[type="text"] { padding: 8px; width: 100%; box-sizing: border-box; border: 
 
 #settingsPanel { background: var(--input-bg); border: 1px solid var(--border-color); padding: 10px; border-radius: 8px; margin-bottom: 10px; flex-shrink: 0; }
 
-.controls { display: flex; gap: 5px; margin-bottom: 10px; flex-shrink: 0; }
-button { padding: 8px; cursor: pointer; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--btn-text); flex: 1; }
-#btnConnect { background: var(--btn-primary); }
-#btnDisconnect { background: #f44336; display: none; }
-#btnToggleMic, #btnToggleSound { background: #2ecc71; } 
-.audio-controls { display: none; gap: 5px; width: 100%; }
+.controls {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    height: 38px; /* Sabit yükseklik */
+}
+
+/* Tüm butonlar için ortak ayar */
+.controls button {
+    height: 100%;
+    padding: 0 2px; /* Yan boşlukları azalttık */
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    
+    /* YAZI AYARLARI (KRİTİK) */
+    font-size: 11px; /* Sığması için biraz küçülttük */
+    font-weight: 700; /* Okunabilirlik için kalın yaptık */
+    color: white;
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    white-space: nowrap; /* Asla alt satıra geçme */
+    overflow: hidden; /* Taşarsa gizle */
+}
+
+/* Mavi 'Sohbete Katıl' */
+#btnConnect { 
+    width: 100%; 
+    background: var(--btn-primary); 
+    font-size: 14px; /* Ana buton büyük kalsın */
+}
+
+/* Kırmızı 'Odadan Ayrıl' */
+#btnDisconnect { 
+    flex: 0 0 25%; /* Genişliği %25'e düşürdük (Yeşillere yer açtık) */
+    background: #f44336; 
+    display: none; 
+}
+#btnDisconnect:hover { background: #d32f2f; }
+
+/* Yeşil Butonların Grubu */
+.audio-controls { 
+    flex: 1; /* Kalan tüm alanı (%75) kapla */
+    display: none; 
+    gap: 5px;
+    height: 100%; 
+}
+
+/* Yeşil Butonlar (Mic ve Ses) */
+#btnToggleMic, #btnToggleSound { 
+    background: #2ecc71; 
+    flex: 1; /* Mevcut alanı eşit paylaş */
+    min-width: 0; /* Flexbox taşma hatasını önler */
+}
 
 /* KULLANICI LİSTESİ */
 #users { flex: 1; overflow-y: auto; margin-top: 5px; border-top: 1px solid var(--border-color); padding-top: 10px; }

@@ -4,15 +4,16 @@ const path = require('path');
 function createWindow() {
     const win = new BrowserWindow({
         width: 600,
-        height: 700,
+        height: 800,
         minWidth: 300,
         minHeight: 500,
+        title: "Natla",
+        autoHideMenuBar: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
-            // KRİTİK AYARLAR BURADA:
             sandbox: false,
-            nodeIntegration: false, // Güvenlik için kapalı kalsın
-            contextIsolation: false, // Preload'ın window'a erişmesi için KAPALI (false) olmalı
+            nodeIntegration: false, 
+            contextIsolation: false,
             enableRemoteModule: false
         }
     });
