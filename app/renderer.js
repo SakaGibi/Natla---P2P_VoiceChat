@@ -20,7 +20,9 @@ let localStream;
 let processedStream;  
 let micGainNode;
 let sourceNode; 
-let audioContext;     
+let audioContext;
+let outputAudioContext;
+let peerGainNodes = {};   
 
 let peers = {}; 
 let userNames = {};
@@ -138,7 +140,16 @@ async function switchMicrophone(deviceId) {
 speakerSelect.addEventListener('change', (e) => {
     const deviceId = e.target.value;
     saveSetting('selectedSpeakerId', deviceId);
-    changeOutputDevice(deviceId);
+    
+    document.querySelectorAll('audio').forEach(async (audio) => {
+        if (audio.setSinkId) {
+            try { await audio.setSinkId(deviceId); } catch (err) { console.error(err); }
+        }
+    });
+
+    if (outputAudioContext && outputAudioContext.setSinkId) {
+        outputAudioContext.setSinkId(deviceId).catch(err => console.error("Hoparlör değişmedi:", err));
+    }
 });
 
 function changeOutputDevice(deviceId) {
@@ -193,16 +204,31 @@ masterSlider.addEventListener('input', (e) => {
 });
 
 // --- BAĞLANMA (BTNCONNECT) ---
+// btnConnect Listener'ını bununla değiştir
 btnConnect.addEventListener('click', async () => {
     const name = inputUsername.value;
     if(!name) return alert("Lütfen bir isim girin!");
     saveSetting('username', name);
 
-    // GÖRÜNÜRLÜK AYARLARI (YENİ)
+    // UI Ayarları
     btnConnect.style.display = 'none'; 
-    activeControls.style.display = 'flex'; // Kare butonları aç
+    activeControls.style.display = 'flex';
     inputUsername.disabled = true;
+
+    // --- SES MOTORLARINI BAŞLAT ---
+    // 1. Mikrofon için Context
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
+    // 2. Gelen Sesler (Hoparlör) için Context
+    outputAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Hoparlör seçimini uygula
+    const selectedSpeaker = speakerSelect.value;
+    if (selectedSpeaker && outputAudioContext.setSinkId) {
+            outputAudioContext.setSinkId(selectedSpeaker).catch(e => console.error(e));
+    }
+    // -----------------------------
+
     statusDiv.innerText = "Ses motoru başlatılıyor...";
     try {
         const selectedMicId = micSelect.value;
@@ -213,22 +239,20 @@ btnConnect.addEventListener('click', async () => {
 
         const rawStream = await navigator.mediaDevices.getUserMedia(constraints);
         
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Mikrofon İşlemleri
         sourceNode = audioContext.createMediaStreamSource(rawStream);
-        
         micGainNode = audioContext.createGain();
         micGainNode.gain.value = micSlider.value / 100; 
         
         const destination = audioContext.createMediaStreamDestination();
-        
         sourceNode.connect(micGainNode);
         micGainNode.connect(destination);
         
         localStream = rawStream; 
         processedStream = destination.stream; 
 
+        // Bağlantı İşlemleri
         statusDiv.innerText = "Sunucuya bağlanılıyor...";
-        
         msgInput.disabled = false;
         btnSend.disabled = false;
         
@@ -346,18 +370,29 @@ btnToggleMic.addEventListener('click', () => {
     setMicState(!isMicMuted);
 });
 
+// renderer.js - btnToggleSound Event Listener
+
 btnToggleSound.addEventListener('click', () => {
     isDeafened = !isDeafened;
+    
     document.querySelectorAll('audio').forEach(audio => audio.muted = isDeafened);
     
-    // YENİ EMOJİ AYARLARI
+    if (outputAudioContext) {
+        if (isDeafened) {
+            outputAudioContext.suspend();
+        } else {
+            outputAudioContext.resume();
+        }
+    }
+    
+    // EMOJİ AYARLARI
     if (isDeafened) {
-        btnToggleSound.innerText = "🔇";  // Ses Kapalı
-        btnToggleSound.style.backgroundColor = "#57160fff";
-        if (!isMicMuted) setMicState(true); // Sağır olunca mikrofonu da kapat
+        btnToggleSound.innerText = "🔇"; 
+        btnToggleSound.style.backgroundColor = "#8b281d"; // Koyu Kırmızı
+        if (!isMicMuted) setMicState(true);
     } else {
-        btnToggleSound.innerText = "🔊";  // Ses Açık
-        btnToggleSound.style.backgroundColor = "#397251ff";
+        btnToggleSound.innerText = "🔊"; 
+        btnToggleSound.style.backgroundColor = "#397251"; // Koyu Yeşil
     }
 });
 
@@ -519,19 +554,24 @@ function addUserUI(id, name, isConnected) {
     }
         
     let volumeControlHTML = '';
-    if (id !== 'me') {
-        volumeControlHTML = `
-            <div class="user-volume">
-                <label>🔊</label>
-                <input type="range" min="0" max="100" value="100" 
-                        oninput="
-                           document.getElementById('audio-${id}').volume = this.value/100;
-                           document.getElementById('vol-val-${id}').innerText = this.value + '%';
-                        ">
-                <span id="vol-val-${id}">100%</span>
-            </div>
-        `;
-    }
+        if (id !== 'me') {
+            volumeControlHTML = `
+                <div class="user-volume">
+                    <label>🔊</label>
+                    <input type="range" min="0" max="300" value="100" 
+                            oninput="
+                                // UI Güncelleme
+                                document.getElementById('vol-val-${id}').innerText = this.value + '%';
+                           
+                                // GainNode (Amfi) Güncelleme
+                                if (peerGainNodes['${id}']) {
+                                    peerGainNodes['${id}'].gain.value = this.value / 100;
+                                }
+                            ">
+                    <span id="vol-val-${id}">100%</span>
+                </div>
+            `;
+        }
 
     el.innerHTML = `
         <div class="user-info">
@@ -598,26 +638,41 @@ function attachVisualizer(stream, id) {
 }
 
 function addAudioElement(id, stream) {
+    // 1. HTML Audio Elementi (Sadece stream'i canlı tutmak için, sesi buradan duymayacağız)
     if (document.getElementById(`audio-${id}`)) return;
     const audio = document.createElement('audio');
     audio.id = `audio-${id}`;
     audio.srcObject = stream;
     audio.autoplay = true;
-    
-    const masterVol = document.getElementById('masterVolume').value;
-    audio.volume = masterVol / 100;
-
-    const selectedSpeaker = document.getElementById('speakerSelect').value;
-    if (selectedSpeaker && audio.setSinkId) {
-        audio.setSinkId(selectedSpeaker).catch(e => console.error(e));
-    }
-
-    if (isDeafened) audio.muted = true;
+    audio.muted = true; // ÖNEMLİ: Sesi HTML'den değil, aşağıda WebAudio'dan duyacağız. Yankı yapmasın diye susturuyoruz.
     document.getElementById('audioContainer').appendChild(audio);
+
+    // 2. Web Audio API ile Ses Yükseltme (Amfi)
+    if (outputAudioContext) {
+        try {
+            const source = outputAudioContext.createMediaStreamSource(stream);
+            
+            const gainNode = outputAudioContext.createGain();
+            
+            gainNode.gain.value = 1.0; 
+            
+            source.connect(gainNode);
+            gainNode.connect(outputAudioContext.destination);
+            
+            peerGainNodes[id] = gainNode;
+            
+        } catch (e) {
+            console.error("Ses motoru hatası:", e);
+            audio.muted = false; 
+        }
+    }
 }
 
 function removePeer(id) {
     if(peers[id]) { peers[id].destroy(); delete peers[id]; }
+    
+    if (peerGainNodes[id]) { delete peerGainNodes[id]; }
+
     const el = document.getElementById(`user-${id}`); if(el) el.remove();
     const aud = document.getElementById(`audio-${id}`); if(aud) aud.remove();
     delete userNames[id];
