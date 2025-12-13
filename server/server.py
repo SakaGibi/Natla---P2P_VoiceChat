@@ -87,15 +87,17 @@ async def handler(ws):
     except websockets.exceptions.ConnectionClosed:
         print(f" [-] Baglanti Koptu: {user_id}")
     finally:
+        leaver_name = clients.get(ws, {}).get("name", None)
+
         # Temizlik
         rooms["main"].discard(ws)
         if ws in clients:
             del clients[ws]
         
-        # Çıkanı haber ver
         await broadcast("main", {
             "type": "user-left",
-            "id": user_id
+            "id": user_id,
+            "name": leaver_name
         })
 
 async def broadcast(room_name, data, except_ws=None):
