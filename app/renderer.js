@@ -1,9 +1,8 @@
-// app/renderer.js - SON, HATASIZ & AMFİ MODLU SÜRÜM
+// app/renderer.js - EKRAN PAYLAŞMA (STOP FIX) & SES & AMFİ
 
 const PORT = 8080;
-// Sunucu IP adresi
 const WS_URL = `ws://3.121.233.106:8080`; 
-
+const SimplePeer = require('simple-peer'); 
 const chatHistory = document.getElementById('chatHistory');
 const msgInput = document.getElementById('msgInput');
 const btnSend = document.getElementById('btnSend');
@@ -16,19 +15,25 @@ const joinSound = new Audio(joinPath);
 joinSound.volume = 0.2;
 
 let socket;
-let localStream;      
+let localStream;
+let screenStream;
 let processedStream;  
 let micGainNode;
 let sourceNode; 
 let audioContext;
-let outputAudioContext; // Gelen ses motoru
-let peerGainNodes = {}; // Kullanıcı ses seviyeleri
+let outputAudioContext; 
+let peerGainNodes = {}; 
 
 let peers = {}; 
 let userNames = {};
 let isMicMuted = false;
 let isDeafened = false;
 let isConnected = false;
+let isSharingScreen = false;
+
+// --- YAYIN DEĞİŞKENLERİ ---
+let activeRemoteStreams = {}; 
+// --------------------------------
 
 // --- GLOBAL VARIABLES ---
 let statusTimeout;       
@@ -45,6 +50,20 @@ const activeControls = document.getElementById('activeControls');
 const btnDisconnect = document.getElementById('btnDisconnect');
 const btnToggleMic = document.getElementById('btnToggleMic');
 const btnToggleSound = document.getElementById('btnToggleSound');
+const btnShareScreen = document.getElementById('btnShareScreen'); 
+
+// --- MODAL ELEMENTLERİ ---
+const streamModal = document.getElementById('streamModal');
+const largeVideoPlayer = document.getElementById('largeVideoPlayer');
+const btnCloseStream = document.getElementById('btnCloseStream');
+const streamerNameLabel = document.getElementById('streamerName');
+
+// Modal Kapatma
+btnCloseStream.addEventListener('click', () => {
+    streamModal.style.display = 'none';
+    largeVideoPlayer.srcObject = null;
+});
+// ------------------------------
 
 const btnTheme = document.getElementById('btnTheme');
 
@@ -56,7 +75,7 @@ const masterSlider = document.getElementById('masterVolume');
 const masterVal = document.getElementById('masterVal');
 
 
-// --- YARDIMCI FONKSİYON: GEÇİCİ BİLDİRİM ---
+// --- YARDIMCI FONKSİYON ---
 function showTemporaryStatus(message) {
     statusDiv.innerText = message;
     if (statusTimeout) clearTimeout(statusTimeout);
@@ -140,14 +159,12 @@ speakerSelect.addEventListener('change', (e) => {
     const deviceId = e.target.value;
     saveSetting('selectedSpeakerId', deviceId);
     
-    // HTML Audio elementlerini güncelle
     document.querySelectorAll('audio').forEach(async (audio) => {
         if (audio.setSinkId) {
             try { await audio.setSinkId(deviceId); } catch (err) { console.error(err); }
         }
     });
 
-    // Ana ses motorunu güncelle (Amfi sistemi için)
     if (outputAudioContext && outputAudioContext.setSinkId) {
         outputAudioContext.setSinkId(deviceId).catch(err => console.error("Hoparlör değişmedi:", err));
     }
@@ -202,26 +219,21 @@ btnConnect.addEventListener('click', async () => {
     if(!name) return alert("Lütfen bir isim girin!");
     saveSetting('username', name);
 
-    // UI Ayarları
     btnConnect.style.display = 'none'; 
     activeControls.style.display = 'flex';
     inputUsername.disabled = true;
 
-    // --- SES MOTORLARINI BAŞLAT ---
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     outputAudioContext = new (window.AudioContext || window.webkitAudioContext)();
     
-    // !!! DÜZELTME: Motor askıdaysa çalıştır !!!
     if (outputAudioContext.state === 'suspended') {
         await outputAudioContext.resume();
     }
 
-    // Hoparlör seçimini uygula
     const selectedSpeaker = speakerSelect.value;
     if (selectedSpeaker && outputAudioContext.setSinkId) {
             outputAudioContext.setSinkId(selectedSpeaker).catch(e => console.error(e));
     }
-    // -----------------------------
 
     statusDiv.innerText = "Ses motoru başlatılıyor...";
     try {
@@ -233,7 +245,6 @@ btnConnect.addEventListener('click', async () => {
 
         const rawStream = await navigator.mediaDevices.getUserMedia(constraints);
         
-        // Mikrofon İşlemleri
         sourceNode = audioContext.createMediaStreamSource(rawStream);
         micGainNode = audioContext.createGain();
         micGainNode.gain.value = micSlider.value / 100; 
@@ -245,11 +256,12 @@ btnConnect.addEventListener('click', async () => {
         localStream = rawStream; 
         processedStream = destination.stream; 
 
-        // Bağlantı İşlemleri
         statusDiv.innerText = "Sunucuya bağlanılıyor...";
         msgInput.disabled = false;
         btnSend.disabled = false;
         
+        btnShareScreen.disabled = false;
+
         userNames["me"] = name + " (Ben)";
         myPeerId = 'me';
         addUserUI("me", userNames["me"], true);
@@ -267,6 +279,72 @@ btnConnect.addEventListener('click', async () => {
 btnSend.addEventListener('click', sendChat);
 msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
 
+// --- EKRAN PAYLAŞMA BUTONU ---
+btnShareScreen.addEventListener('click', async () => {
+    if (!isSharingScreen) {
+        // PAYLAŞIMI BAŞLAT
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                video: true, 
+                audio: false 
+            });
+
+            isSharingScreen = true;
+            btnShareScreen.innerText = "🛑 Durdur";
+            btnShareScreen.style.backgroundColor = "#e74c3c"; // Kırmızı
+
+            // Tarayıcıdan durdurulursa
+            screenStream.getVideoTracks()[0].onended = () => {
+                stopScreenShare();
+            };
+
+            for (let id in peers) {
+                try {
+                    peers[id].addStream(screenStream);
+                } catch (err) {
+                    console.error("Akış eklenemedi:", err);
+                }
+            }
+
+            showTemporaryStatus("Ekran paylaşılıyor...");
+
+        } catch (err) {
+            console.error("Ekran paylaşımı iptal:", err);
+        }
+    } else {
+        // PAYLAŞIMI DURDUR
+        stopScreenShare();
+    }
+});
+
+function stopScreenShare() {
+    if (!screenStream) return;
+    
+    screenStream.getTracks().forEach(track => track.stop());
+    
+    // Peer'lardan akışı kaldır ve BİLDİRİM GÖNDER
+    for (let id in peers) {
+        try {
+            peers[id].removeStream(screenStream);
+            
+            // --- GÜNCELLEME: KARŞI TARAFA "BİTTİ" SİNYALİ GÖNDER ---
+            peers[id].send(JSON.stringify({ 
+                type: 'video-stopped', 
+                senderId: 'me' 
+            }));
+            // --------------------------------------------------------
+
+        } catch (err) { console.error(err); }
+    }
+    
+    screenStream = null;
+    isSharingScreen = false;
+    
+    btnShareScreen.innerText = "🖥️ Paylaş";
+    btnShareScreen.style.backgroundColor = "#0288d1"; 
+    showTemporaryStatus("Ekran paylaşımı durduruldu.");
+}
+
 // --- ODADAN AYRILMA ---
 btnDisconnect.addEventListener('click', () => {
     disconnectRoom();
@@ -275,6 +353,9 @@ btnDisconnect.addEventListener('click', () => {
 function disconnectRoom() {
     isConnected = false;
     
+    if (isSharingScreen) stopScreenShare(); 
+    btnShareScreen.disabled = true;
+
     if (socket) { socket.close(); socket = null; }
 
     for (let id in peers) { peers[id].destroy(); }
@@ -282,7 +363,7 @@ function disconnectRoom() {
 
     if (localStream) localStream.getTracks().forEach(t => t.stop());
     if (audioContext) audioContext.close();
-    if (outputAudioContext) outputAudioContext.close(); // Motoru kapat
+    if (outputAudioContext) outputAudioContext.close(); 
     
     localStream = null;
     audioContext = null;
@@ -291,7 +372,10 @@ function disconnectRoom() {
     document.getElementById('userList').innerHTML = ''; 
     document.getElementById('audioContainer').innerHTML = ''; 
     
-    // GÖRÜNÜRLÜK AYARLARI
+    streamModal.style.display = 'none';
+    largeVideoPlayer.srcObject = null;
+    activeRemoteStreams = {};
+    
     btnConnect.style.display = 'block'; 
     activeControls.style.display = 'none'; 
     
@@ -343,7 +427,7 @@ function sendPeerStatusUpdate(payload) {
     }
 }
 
-// --- SES KONTROLLERİ VE EMOJİLER ---
+// --- SES KONTROLLERİ ---
 function setMicState(mute) {
     if (!localStream) return;
     const track = localStream.getAudioTracks()[0];
@@ -354,10 +438,10 @@ function setMicState(mute) {
 
     if (isMicMuted) {
         btnToggleMic.innerText = "🎤✖"; 
-        btnToggleMic.style.backgroundColor = "#8b281d"; // Koyu Kırmızı
+        btnToggleMic.style.backgroundColor = "#8b281d"; 
     } else {
         btnToggleMic.innerText = "🎤"; 
-        btnToggleMic.style.backgroundColor = "#397251"; // Koyu Yeşil
+        btnToggleMic.style.backgroundColor = "#397251"; 
     }
 }
 
@@ -366,14 +450,11 @@ btnToggleMic.addEventListener('click', () => {
     setMicState(!isMicMuted);
 });
 
-// SESİ KAPAT (DEAFEN) DÜZELTMESİ
 btnToggleSound.addEventListener('click', () => {
     isDeafened = !isDeafened;
     
-    // HTML Elementlerini Sustur
     document.querySelectorAll('audio').forEach(audio => audio.muted = isDeafened);
     
-    // !!! MOTORU SUSTUR (ÖNEMLİ) !!!
     if (outputAudioContext) {
         if (isDeafened) {
             outputAudioContext.suspend();
@@ -421,40 +502,22 @@ document.querySelectorAll('.soundpad-btn').forEach((btn, index) => {
 function playLocalSound(effectName) {
     try {
         let soundPath = path.join(__dirname, 'assets', `${effectName}.mp3`);
-        if (soundPath.includes('app.asar')) soundPath = soundPath.replace('app.asar', 'app.asar.unpacked');
-
-        console.log("[playLocalSound] soundPath:", soundPath, "isDeafened:", isDeafened);
-
-        if (isDeafened) {
-            console.log("[playLocalSound] Kullanıcı deafened durumda, ses çalmıyor.");
-            return;
-        }
-
-        const audio = new Audio(soundPath);
-        audio.oncanplay = () => console.log("[playLocalSound] oncanplay fired");
-        audio.onplay = () => console.log("[playLocalSound] onplay fired");
-        audio.onerror = (e) => console.error("[playLocalSound] audio error:", e);
-
-        const masterVol = document.getElementById('masterVolume')?.value || 100;
+        soundPath = soundPath.replace('app.asar', 'app.asar.unpacked');
+        
+        const audio = new Audio(soundPath); 
+        const masterVol = document.getElementById('masterVolume').value;
         audio.volume = masterVol / 100;
-
-        const selectedSpeaker = document.getElementById('speakerSelect')?.value;
+        
+        const selectedSpeaker = document.getElementById('speakerSelect').value;
         if (selectedSpeaker && audio.setSinkId) {
-            audio.setSinkId(selectedSpeaker).catch(e => console.warn("setSinkId hatası:", e));
+             audio.setSinkId(selectedSpeaker).catch(e => {});
         }
 
-        audio.play().then(() => {
-            console.log("[playLocalSound] audio.play() succeeded for", effectName);
-        }).catch(err => {
-            console.error("[playLocalSound] audio.play() failed:", err);
-        });
+        if (isDeafened) return; 
 
-    } catch (e) {
-        console.error("[playLocalSound] Hata:", e);
-    }
+        audio.play().catch(e => console.warn("Ses çalma hatası:", e));
+    } catch (e) { console.error("Ses dosyası hatası:", e); }
 }
-
-
 
 // --- WEBSOCKET ---
 function connectSocket(name) {
@@ -479,29 +542,26 @@ function connectSocket(name) {
             } 
             else if (data.type === 'user-joined') {
                 onlineUserCount++; 
-                console.log("[JOIN] data:", data);
-                console.log("[JOIN] userNames before:", userNames);
                 userNames[data.id] = data.name;
-                console.log("[JOIN] userNames after:", userNames);
                 updateNameUI(data.id, data.name);
                 joinSound.play().catch(e => {});                
                 showTemporaryStatus(`${data.name} katıldı 👋`);
             } 
-            else if (data.type === "user-left") {
-            console.log("[WS] user-left data:", data);
-
-            const leaverName = data.name
-
-            playLocalSound("cikis");
-
-            showTemporaryStatus(`${leaverName} ayrıldı`);
-
-            // cleanup
-            removeUserUI(data.id);
-            delete userNames[data.id];
+            else if (data.type === 'user-left') {
+                if (peers[data.id]) { onlineUserCount--; }
+                
+                const leaverName = userNames[data.id] || "Biri";
+                const targetFriendName = "berkypci"; 
+                
+                if (leaverName.trim().toLowerCase() === targetFriendName.toLowerCase()) {
+                    playLocalSound("cikis"); 
+                    showTemporaryStatus(`${leaverName} kaçtı! 🏃‍♂️`);
+                } else {
+                    showTemporaryStatus(`${leaverName} ayrıldı 💨`);
+                }
+                
+                removePeer(data.id);
             }
-
-
             else if (data.type === 'signal') handleSignal(data.senderId, data.signal);
         } catch (e) { console.error(e); }
     };
@@ -513,9 +573,9 @@ function connectSocket(name) {
 // --- P2P ---
 function createPeer(targetId, name, initiator) {
     try {
-        const peer = new window.SimplePeer({
+        const peer = new SimplePeer({
             initiator: initiator,
-            stream: processedStream,
+            stream: processedStream, 
             trickle: false,
             config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
         });
@@ -525,13 +585,21 @@ function createPeer(targetId, name, initiator) {
                 socket.send(JSON.stringify({ type: 'signal', targetId: targetId, signal: signal }));
         });
 
+        // GELEN AKIŞI YÖNETME 
         peer.on('stream', stream => {
-            addAudioElement(targetId, stream);
-            const finalName = userNames[targetId] || name || "Bilinmeyen";
-            addUserUI(targetId, finalName, true);
-            attachVisualizer(stream, targetId);
+            if (stream.getVideoTracks().length > 0) {
+                console.log("Video akışı alındı:", targetId);
+                addVideoElement(targetId, stream);
+            } 
+            else {
+                addAudioElement(targetId, stream);
+                const finalName = userNames[targetId] || name || "Bilinmeyen";
+                addUserUI(targetId, finalName, true);
+                attachVisualizer(stream, targetId);
+            }
         });
 
+        // VERİ GELDİĞİNDE (CHAT veya DURUM)
         peer.on('data', data => {
             try {
                 const strData = new TextDecoder("utf-8").decode(data);
@@ -546,11 +614,20 @@ function createPeer(targetId, name, initiator) {
                 else if (msg.type === 'sound-effect') {
                     playLocalSound(msg.effectName);
                 }
+                // --- GÜNCELLEME: YAYIN BİTTİ MESAJINI YAKALA ---
+                else if (msg.type === 'video-stopped') {
+                    removeVideoElement(targetId);
+                }
+                // -----------------------------------------------
             } catch (e) { console.error("Gelen P2P Data hatası:", e); }
         });
 
+        peer.on('error', err => {
+            if (err.message.includes('User-Initiated Abort') || err.message.includes('Close called')) return;
+            console.error("Peer hatası:", err);
+        });
+
         peer.on('close', () => removePeer(targetId));
-        peer.on('error', err => console.error("Peer hatası:", err));
 
         peers[targetId] = peer;
         if(!document.getElementById(`user-${targetId}`)) {
@@ -673,16 +750,11 @@ function addAudioElement(id, stream) {
     if (outputAudioContext) {
         try {
             const source = outputAudioContext.createMediaStreamSource(stream);
-            
             const gainNode = outputAudioContext.createGain();
-            
             gainNode.gain.value = 1.0; 
-            
             source.connect(gainNode);
             gainNode.connect(outputAudioContext.destination);
-            
             peerGainNodes[id] = gainNode;
-            
         } catch (e) {
             console.error("Ses motoru hatası:", e);
             audio.muted = false; 
@@ -690,12 +762,65 @@ function addAudioElement(id, stream) {
     }
 }
 
+function addVideoElement(id, stream) {
+    console.log("Video akışı hafızaya alındı:", id);
+    activeRemoteStreams[id] = stream;
+
+    const userCard = document.getElementById(`user-${id}`);
+    if (userCard) {
+        if (userCard.querySelector('.stream-icon-btn')) return;
+
+        const btnWatch = document.createElement('button');
+        btnWatch.className = 'stream-icon-btn';
+        btnWatch.innerHTML = '🖥️ İZLE';
+        btnWatch.title = 'Yayını İzlemek İçin Tıkla';
+        
+        btnWatch.onclick = () => { openStreamModal(id); };
+
+        userCard.appendChild(btnWatch);
+    }
+
+    stream.getVideoTracks()[0].onended = () => {
+        removeVideoElement(id);
+    };
+}
+
+function removeVideoElement(id) {
+    delete activeRemoteStreams[id];
+    
+    const userCard = document.getElementById(`user-${id}`);
+    if (userCard) {
+        const btn = userCard.querySelector('.stream-icon-btn');
+        if (btn) btn.remove();
+    }
+
+    if (streamModal.style.display !== 'none' && streamerNameLabel.getAttribute('data-id') === id) {
+        streamModal.style.display = 'none';
+        largeVideoPlayer.srcObject = null;
+    }
+}
+
+function openStreamModal(id) {
+    const stream = activeRemoteStreams[id];
+    if (!stream) return alert("Yayın bulunamadı!");
+
+    largeVideoPlayer.srcObject = stream;
+    streamerNameLabel.innerText = `${userNames[id] || 'Kullanıcı'} - Ekran Yayını`;
+    streamerNameLabel.setAttribute('data-id', id); 
+    
+    streamModal.style.display = 'flex'; 
+}
+
 function removePeer(id) {
     if(peers[id]) { peers[id].destroy(); delete peers[id]; }
-    
     if (peerGainNodes[id]) { delete peerGainNodes[id]; }
+
+    if (activeRemoteStreams[id]) {
+        removeVideoElement(id); 
+    }
 
     const el = document.getElementById(`user-${id}`); if(el) el.remove();
     const aud = document.getElementById(`audio-${id}`); if(aud) aud.remove();
+    
     delete userNames[id];
 }
