@@ -86,7 +86,6 @@ function showTemporaryStatus(message) {
 
 // --- BAŞLANGIÇ ---
 window.onload = () => {
-    if (!window.SimplePeer) document.getElementById('error-log').innerText = "HATA: SimplePeer yüklenemedi.";
     loadSettings();
     getDevices(); 
 };
