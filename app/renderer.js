@@ -9,7 +9,7 @@ const btnSend = document.getElementById('btnSend');
 const path = require('path');
 
 // Giriş Sesi Ayarı
-let joinPath = path.join(__dirname, 'assets', 'gazmaliyim.mp3');
+let joinPath = path.join(__dirname, 'assets', /*'gazmaliyim.mp3'*/);
 joinPath = joinPath.replace('app.asar', 'app.asar.unpacked');
 const joinSound = new Audio(joinPath);
 joinSound.volume = 0.2;
@@ -30,6 +30,7 @@ let isMicMuted = false;
 let isDeafened = false;
 let isConnected = false;
 let isSharingScreen = false;
+let isShowingTempMessage = false;
 
 // --- YAYIN DEĞİŞKENLERİ ---
 let activeRemoteStreams = {}; 
@@ -76,12 +77,27 @@ const masterVal = document.getElementById('masterVal');
 
 
 // --- YARDIMCI FONKSİYON ---
+// --- YARDIMCI FONKSİYON: GEÇİCİ BİLDİRİM (DÜZELTİLDİ) ---
 function showTemporaryStatus(message) {
+    isShowingTempMessage = true; // Kilit vuruyoruz
     statusDiv.innerText = message;
+    
     if (statusTimeout) clearTimeout(statusTimeout);
+    
     statusTimeout = setTimeout(() => {
+        isShowingTempMessage = false; // Kilidi açıyoruz
+        // Süre bitince güncel sayıyı yazdır
         statusDiv.innerText = `Sohbet Odası (${onlineUserCount} Kişi)`;
     }, 3000);
+}
+
+function updateOnlineCount() {
+    const count = Object.keys(userNames).length;
+    onlineUserCount = count;
+
+    if (!isShowingTempMessage) {
+        statusDiv.innerText = `Sohbet Odası (${count} Kişi)`;
+    }
 }
 
 // --- BAŞLANGIÇ ---
@@ -475,9 +491,21 @@ btnToggleSound.addEventListener('click', () => {
 // --- SOUNDPAD ---
 const soundEffects = [
     { file: 'fahh_effect', title: 'Fahh Efekti' },  
-    { file: 'effect_2',    title: 'Alkış Sesi' },   
-    { file: 'effect_3',    title: 'Zil Sesi' },     
-    { file: 'effect_4',    title: 'Gülme Efekti' }, 
+    { file: 'ahhhhhhh_effect', title: 'Ahhhhhhh Efekti' },    
+    { file: 'besili_camis_effect',    title: 'besili camış' },     
+    { file: 'denyo_dangalak_effect',    title: 'denyo mu dangalak mı?' },
+    { file: 'deplasman_yasağı_effect', title: 'deplasman yarağı' },
+    { file: 'levo_rage_effect', title: 'harika bir oyun' },
+    { file: 'masaj_salonu_effect', title: 'mecidiyeköy masaj salonu' },
+    { file: 'neden_ben_effect', title: 'Neden dede neden beni seçtin' },
+    { file: 'samsun_anlık_effect', title: 'adalet mahallesinde gaza' },
+    { file: 'simdi_hoca_effect', title: 'şimdi hocam, position is obvious' },
+    { file: 'ananı_effect', title: 'ananı s...' },
+    { file: 'yalvarırım_ağzına_effect', title: 'yalvarırım ağzına al' },
+    { file: 'sus_artık_effect', title: 'yeter be sus artık' },
+    { file: '', title: '' },
+    { file: '', title: '' },
+    { file: '', title: '' }
 ];
 
 document.querySelectorAll('.soundpad-btn').forEach((btn, index) => {
@@ -532,23 +560,24 @@ function connectSocket(name) {
             const data = JSON.parse(event.data);
             
             if (data.type === 'user-list') {
-                onlineUserCount = data.users.length + 1; 
-                statusDiv.innerText = `Sohbet Odası (${onlineUserCount} Kişi)`;
+                // Listeyi aldık, önce peer'ları oluşturalım
                 data.users.forEach(user => {
                     userNames[user.id] = user.name;
                     createPeer(user.id, user.name, true);
                 });
+                // Sonra sayımı güncelle
+                updateOnlineCount();
             } 
             else if (data.type === 'user-joined') {
-                onlineUserCount++; 
                 userNames[data.id] = data.name;
                 updateNameUI(data.id, data.name);
                 joinSound.play().catch(e => {});                
                 showTemporaryStatus(`${data.name} katıldı 👋`);
+                
+                // Yeni kişi geldi, sayıyı güncelle
+                updateOnlineCount();
             } 
             else if (data.type === 'user-left') {
-                if (peers[data.id]) { onlineUserCount--; }
-                
                 const leaverName = userNames[data.id] || "Biri";
                 const targetFriendName = "berkypci"; 
                 
@@ -822,4 +851,6 @@ function removePeer(id) {
     const aud = document.getElementById(`audio-${id}`); if(aud) aud.remove();
     
     delete userNames[id];
+
+    updateOnlineCount();
 }
