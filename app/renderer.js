@@ -1,6 +1,4 @@
-// app/renderer.js - MÜKEMMEL DÜZEN VE BAĞLANTI DURUMU
-
-const WS_URL = `ws://localhost:8080`; 
+const WS_URL = `ws://3.121.233.106:8080`; 
 
 const SimplePeer = require('simple-peer'); 
 const chatHistory = document.getElementById('chatHistory');
@@ -513,12 +511,14 @@ function handleSignal(senderId, signal) {
 
 // UI Helpers (BAĞLANIYOR... MANTIĞI)
 let activeRemoteStreams = {}; 
+// renderer.js içinde bu fonksiyonu bul ve tamamen bununla değiştir:
+
 function addUserUI(id, name, isConnected) {
     let el = document.getElementById(`user-${id}`);
     
     // Duruma göre metin ve renk
     const statusText = isConnected ? 'Canlı' : 'Bağlanıyor...';
-    const statusColor = isConnected ? '#2ecc71' : '#f1c40f'; // Yeşil : Turuncu
+    const statusColor = isConnected ? '#2ecc71' : '#f1c40f'; 
     
     // Eğer kart varsa sadece durumu güncelle
     if (el) {
@@ -536,7 +536,15 @@ function addUserUI(id, name, isConnected) {
     el.className = 'user-card'; 
     userListDiv.appendChild(el);
     
-    let volHTML = id !== 'me' ? `<div class="user-volume"><label>🔊</label><input type="range" min="0" max="300" value="100" oninput="document.getElementById('vol-val-${id}').innerText=this.value+'%'; if(peerGainNodes['${id}']) peerGainNodes['${id}'].gain.value=this.value/100;"><span id="vol-val-${id}">100%</span></div>` : '';
+    // --- DÜZELTME BURADA YAPILDI (Style eklendi) ---
+    // Input'a style="flex:1; width:100%;" ekledik. Artık %100 genişler.
+    let volHTML = id !== 'me' ? `
+    <div class="user-volume" style="display:flex; width:100%; align-items:center; gap:5px;">
+        <label>🔊</label>
+        <input type="range" style="flex:1; width:100%; cursor:pointer;" min="0" max="300" value="100" oninput="document.getElementById('vol-val-${id}').innerText=this.value+'%'; if(peerGainNodes['${id}']) peerGainNodes['${id}'].gain.value=this.value/100;">
+        <span id="vol-val-${id}" style="font-size:11px; width:35px; text-align:right;">100%</span>
+    </div>` : '';
+    // ------------------------------------------------
     
     el.innerHTML = `<div class="user-info">${id !== 'me' ? '<span class="mic-icon">🎤</span>' : ''}<span class="user-name">${name}</span><span class="user-status" style="color:${statusColor}">${statusText}</span></div>${volHTML}<div class="meter-bg"><div id="meter-fill-${id}" class="meter-fill"></div></div>`;
     
