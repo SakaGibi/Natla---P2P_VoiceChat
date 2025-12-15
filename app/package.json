@@ -1,32 +1,21 @@
 {
-  "name": "natla-voice",
-  "productName": "Natla",
-  "version": "1.0.0",
-  "description": "P2P Sesli Sohbet Uygulaması",
+  "name": "natla",
+  "version": "2.0.1",
+  "description": "Sesli sohbet uygulaması",
   "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder"
-  },
-  "keywords": [],
-  "author": "Emre Cem",
-  "license": "ISC",
-  "devDependencies": {
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8"
-  },
-  "dependencies": {
-    "simple-peer": "^9.11.1"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SakaGibi/VoiceChat-p2p.git"
   },
   "build": {
-    "appId": "com.p2p.natla",
+    "appId": "com.natla.app",
     "productName": "Natla",
-    "files": [
-      "**/*",
-      "!dist/*"
-    ],
-    "asarUnpack": [
-      "assets/**/*"
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SakaGibi",
+        "repo": "VoiceChat-p2p"
+      }
     ],
     "win": {
       "target": "nsis",
@@ -34,16 +23,23 @@
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Natla",
-      "installerIcon": "assets/gazmaliyim.ico",
-      "uninstallerIcon": "assets/gazmaliyim.ico"
-    },
-    "directories": {
-      "output": "dist"
+      "allowToChangeInstallationDirectory": true
     }
+  },
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --publish always"
+  },
+  "keywords": [],
+  "author": "SakaGibi",
+  "license": "ISC",
+  "dependencies": {
+    "electron-log": "^5.1.0",
+    "electron-updater": "^6.1.7",
+    "simple-peer": "^9.11.1"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
   }
 }
