@@ -10,9 +10,9 @@ const path = require('path');
 let joinPath = path.join(__dirname, 'assets', 'RIZZ_effect.mp3');
 joinPath = joinPath.replace('app.asar', 'app.asar.unpacked');
 const joinSound = new Audio(joinPath);
-joinSound.volume = 0.2;
+joinSound.volume = 1;
 const leaveSound = new Audio(path.join(__dirname, 'assets', 'cikis_effect.mp3').replace('app.asar', 'app.asar.unpacked'));
-leaveSound.volume = 0.2; // Herkes için sabit ses düzeyi
+leaveSound.volume = 1;
 
 let socket;
 let localStream;
@@ -428,7 +428,7 @@ btnToggleSound.addEventListener('click', () => {
 
 // Soundpad
 const soundEffects = [
-    { file: 'fahh_effect', title: 'Fahh Efekti', short: 'fahh'},  
+    { file: 'fahh_effect', title: 'Fahh Efekti', short: 'fahh',},  
     { file: 'ahhhhhhh_effect', title: 'Ahhhhhhh Efekti', short: 'aaah'},    
     { file: 'besili_camis_effect',    title: 'besili camış', short: 'besili camış' },     
     { file: 'denyo_dangalak_effect',    title: 'denyo mu dangalak mı?', short: 'denyo' },
@@ -439,7 +439,7 @@ const soundEffects = [
     { file: 'samsun_anlık_effect', title: 'adalet mahallesinde gaza', short: 'Samsun Anlık' },
     { file: 'simdi_hoca_effect', title: 'şimdi hocam, position is obvious', short: 'Şimdi Hoca' },
     { file: 'soru_yanlısmıs_effect', title: 'Yauv sen yanlış yapmadın, soru yanlışmış yauv', short: 'Soru Yanlışmış Yauv' },
-    { file: 'yalvarırım_ağzına_effect', title: 'yalvarırım ağzına al', short: 'ağzına al' },
+    { file: 'çok_zor_ya_effect', title: 'çok zor ya', short: 'çok zor ya' },
     { file: 'sus_artık_effect', title: 'yeter be sus artık', short: 'sus artık' },
     { file: 'buz_bira_effect', title: 'buz gibi bira var mı?', short: 'buz bira' },
     { file: 'osu_effect', title: 'yankılı osuruk', short: 'osuruk' },
