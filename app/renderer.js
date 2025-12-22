@@ -5,6 +5,8 @@ const chatHistory = document.getElementById('chatHistory');
 const msgInput = document.getElementById('msgInput');
 const btnSend = document.getElementById('btnSend');
 const path = require('path');
+const fileInput = document.getElementById('fileInput');
+const btnAttach = document.getElementById('btnAttach');
 
 // Giriş Sesi
 let joinPath = path.join(__dirname, 'assets', 'RIZZ_effect.mp3');
@@ -490,15 +492,30 @@ function createPeer(targetId, name, initiator) {
             }
         });
         
+        // renderer.js - createPeer fonksiyonu içerisindeki data eventi
         peer.on('data', data => { 
-             try {
+            try {
                 const strData = new TextDecoder("utf-8").decode(data);
                 const msg = JSON.parse(strData);
-                if (msg.type === 'chat') addMessageToUI(msg.sender, msg.text, 'received', msg.time);
-                else if (msg.type === 'mic-status') updateMicStatusUI(targetId, msg.isMuted);
-                else if (msg.type === 'sound-effect') playLocalSound(msg.effectName);
-                else if (msg.type === 'video-stopped') removeVideoElement(targetId);
-            } catch (e) {}
+                
+                if (msg.type === 'file-metadata' || msg.type === 'file-end') {
+                    handleIncomingFileData(targetId, data);
+                    return;
+                }
+
+                if (msg.type === 'chat') {
+                    addMessageToUI(msg.sender, msg.text, 'received', msg.time);
+                } else if (msg.type === 'mic-status') {
+                    updateMicStatusUI(targetId, msg.isMuted);
+                } else if (msg.type === 'sound-effect') {
+                    playLocalSound(msg.effectName);
+                } else if (msg.type === 'video-stopped') {
+                    removeVideoElement(targetId);
+                }
+
+            } catch (e) {
+                handleIncomingFileData(targetId, data);
+            }
         });
         
         peer.on('close', () => removePeer(targetId));
@@ -545,15 +562,12 @@ function addUserUI(id, name, isConnected) {
     el.className = 'user-card'; 
     userListDiv.appendChild(el);
     
-    // --- DÜZELTME BURADA YAPILDI (Style eklendi) ---
-    // Input'a style="flex:1; width:100%;" ekledik. Artık %100 genişler.
     let volHTML = id !== 'me' ? `
     <div class="user-volume" style="display:flex; width:100%; align-items:center; gap:5px;">
         <label>🔊</label>
         <input type="range" style="flex:1; width:100%; cursor:pointer;" min="0" max="300" value="100" oninput="document.getElementById('vol-val-${id}').innerText=this.value+'%'; if(peerGainNodes['${id}']) peerGainNodes['${id}'].gain.value=this.value/100;">
         <span id="vol-val-${id}" style="font-size:11px; width:35px; text-align:right;">100%</span>
     </div>` : '';
-    // ------------------------------------------------
     
     el.innerHTML = `<div class="user-info">${id !== 'me' ? '<span class="mic-icon">🎤</span>' : ''}<span class="user-name">${name}</span><span class="user-status" style="color:${statusColor}">${statusText}</span></div>${volHTML}<div class="meter-bg"><div id="meter-fill-${id}" class="meter-fill"></div></div>`;
     
@@ -604,4 +618,44 @@ function openStreamModal(id) {
     streamerNameLabel.innerText = `${userNames[id]||'Biri'} Ekranı`;
     streamerNameLabel.setAttribute('data-id', id);
     streamModal.style.display = 'flex';
+}
+
+if (btnAttach && fileInput) {
+    // Tıklama olayını sadece bir kez tanımlıyoruz
+    btnAttach.addEventListener('click', () => {
+        console.log("📎 Ataç tıklandı. Bağlantı durumu:", isConnected);
+        if (!isConnected) return alert("Önce bir odaya bağlanmalısınız!");
+        
+        // Sadece bir kez tetiklenir
+        fileInput.click();
+    });
+
+    // Dosya seçme olayını tanımlıyoruz
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        console.log("📂 Dosya seçildi:", file.name);
+
+        // 2GB Limit Kontrolü
+        const MAX_SIZE = 2 * 1024 * 1024 * 1024; 
+        if (file.size > MAX_SIZE) {
+            alert(`Dosya çok büyük (${(file.size / (1024 * 1024)).toFixed(2)} MB)! Maksimum 2GB gönderebilirsiniz.`);
+            e.target.value = '';
+            return;
+        }
+
+        // Dosya gönderimini başlat
+        if (typeof window.addFileSentUI === 'function') {
+            const tId = "transfer-" + Date.now();
+            window.addFileSentUI(file, tId);
+            
+            for (let id in peers) {
+                window.sendFile(peers[id], file, tId);
+            }
+        }
+        
+        // Değeri sıfırla (Aynı dosyayı tekrar seçebilmek için)
+        e.target.value = ''; 
+    });
 }
