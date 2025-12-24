@@ -597,7 +597,11 @@ function addUserUI(id, name, isConnected) {
     let volHTML = id !== 'me' ? `
     <div class="user-volume" style="display:flex; width:100%; align-items:center; gap:5px;">
         <label>🔊</label>
-        <input type="range" style="flex:1; width:100%; cursor:pointer;" min="0" max="300" value="100" oninput="document.getElementById('vol-val-${id}').innerText=this.value+'%'; if(peerGainNodes['${id}']) peerGainNodes['${id}'].gain.value=this.value/100;">
+        <input type="range" 
+               style="flex:1; width:100%; cursor:pointer;" 
+               min="0" max="300" value="100" 
+               id="vol-slider-${id}"
+               oninput="updatePeerVolume('${id}', this.value)">
         <span id="vol-val-${id}" style="font-size:11px; width:35px; text-align:right;">100%</span>
     </div>` : '';
     
@@ -695,4 +699,18 @@ if (btnAttach && fileInput) {
         }
         e.target.value = ''; 
     });
+}
+
+function updatePeerVolume(id, value) {
+    const valSpan = document.getElementById(`vol-val-${id}`);
+    if (valSpan) valSpan.innerText = value + '%';
+    
+    const gainValue = (value / 100) * (masterSlider.value / 100);
+
+    if (peerGainNodes[id]) {
+        peerGainNodes[id].gain.setTargetAtTime(gainValue, outputAudioContext.currentTime, 0.01);
+    } else {
+        const aud = document.getElementById(`audio-${id}`);
+        if (aud) aud.volume = Math.min(1, gainValue);
+    }
 }
