@@ -1,23 +1,35 @@
-// fileTransfer.js - Tam sürüm (Önizleme + İptal + Stabil Akış)
+// fileTransfer.js - Tam Sürüm (Önizleme + Sesli Bildirim + Dinamik Durum + Akıllı İptal)
 
 window.receivingFiles = {}; 
 window.activeTransfers = {};
-window.activeIncomingTransferIds = {}; // senderId -> tId eşleşmesi
+window.activeIncomingTransferIds = {}; 
 
 // 1. İPTAL FONKSİYONU
 window.cancelTransfer = function(tId, isSender = true) {
+    console.log(`🚫 İptal tetiklendi. tId: ${tId}, Gönderen mi: ${isSender}`);
+
     if (window.activeTransfers[tId]) {
         window.activeTransfers[tId].cancelled = true; 
-        if (isSender) {
-            for (let pId in peers) {
-                try { 
-                    peers[pId].send(JSON.stringify({ type: 'file-cancel', payload: { tId: tId } })); 
-                } catch(e) {}
-            }
-        }
     }
-    const card = document.getElementById(isSender ? `card-${tId}` : `card-rec-${tId}`);
-    if (card) card.remove();
+
+    if (isSender) {
+        // Diğer kullanıcılara iptal sinyali gönder
+        const targetPeers = window.peers || {}; 
+        for (let pId in targetPeers) {
+            try { 
+                targetPeers[pId].send(JSON.stringify({ type: 'file-cancel', payload: { tId: tId } })); 
+            } catch(e) {}
+        }
+        
+        // Gönderen ekranını güncelle
+        const statusSpan = document.querySelector(`#card-${tId} .transfer-status`);
+        const cancelBtn = document.getElementById(`cancel-btn-${tId}`);
+        if (statusSpan) {
+            statusSpan.innerText = "İPTAL EDİLDİ ❌";
+            statusSpan.style.color = "#ff4757";
+        }
+        if (cancelBtn) cancelBtn.remove();
+    }
 };
 
 // 2. GÖNDERİCİ UI (Yerel Önizlemeli)
@@ -27,8 +39,8 @@ window.addFileSentUI = function(file, tId) {
     div.className = 'message sent file-message';
     div.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-size:11px; font-weight:bold; opacity:0.8;">GÖNDERİLİYOR</span>
-            <button onclick="cancelTransfer('${tId}', true)" style="background:none; border:none; color:#ff4757; cursor:pointer; font-size:16px; padding:0;">✖</button>
+            <span class="transfer-status" style="font-size:11px; font-weight:bold; opacity:0.8;">GÖNDERİLİYOR</span>
+            <button id="cancel-btn-${tId}" onclick="cancelTransfer('${tId}', true)" style="background:none; border:none; color:#ff4757; cursor:pointer; font-size:16px; padding:0;">✖</button>
         </div>
         <div id="preview-cont-${tId}" class="preview-container" style="display:none;">
             <img id="preview-img-${tId}" class="preview-thumb">
@@ -41,7 +53,6 @@ window.addFileSentUI = function(file, tId) {
     `;
     document.getElementById('chatHistory').appendChild(div);
     
-    // Resim Önizleme İşlemi
     if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -49,7 +60,6 @@ window.addFileSentUI = function(file, tId) {
             if (img) {
                 img.src = e.target.result;
                 document.getElementById(`preview-cont-${tId}`).style.display = 'block';
-                document.getElementById('chatHistory').scrollTop = document.getElementById('chatHistory').scrollHeight;
             }
         };
         reader.readAsDataURL(file);
@@ -57,18 +67,15 @@ window.addFileSentUI = function(file, tId) {
     document.getElementById('chatHistory').scrollTop = document.getElementById('chatHistory').scrollHeight;
 };
 
-// 3. GÖNDERME MOTORU
+// 3. GÖNDERME MOTORU (Bitiş Sesi Eklendi)
 window.sendFile = function(peer, file, tId) {
     if (!peer || !peer.connected) return;
-    if (!window.activeTransfers[tId]) window.activeTransfers[tId] = { cancelled: false, fileName: file.name };
+    if (!window.activeTransfers[tId]) window.activeTransfers[tId] = { cancelled: false };
 
     const chunkSize = 16 * 1024;
     let offset = 0;
 
-    peer.send(JSON.stringify({ 
-        type: 'file-metadata', 
-        payload: { name: file.name, size: file.size, type: file.type, tId: tId } 
-    }));
+    peer.send(JSON.stringify({ type: 'file-metadata', payload: { name: file.name, size: file.size, type: file.type, tId: tId } }));
 
     const readAndSend = () => {
         if (window.activeTransfers[tId]?.cancelled) return;
@@ -87,19 +94,35 @@ window.sendFile = function(peer, file, tId) {
             const bar = document.getElementById(`prog-${tId}`);
             if (bar) bar.style.width = (offset / file.size * 100) + "%";
 
-            if (offset < file.size) readAndSend();
-            else peer.send(JSON.stringify({ type: 'file-end', payload: { tId: tId } }));
+            if (offset < file.size) {
+                readAndSend();
+            } else {
+                // --- GÖNDERİM BİTTİ (GÖNDEREN TARAFINDA) ---
+                peer.send(JSON.stringify({ type: 'file-end', payload: { tId: tId } }));
+                
+                // GÖNDERİCİ BİLDİRİM SESİ
+                if (typeof notificationSound !== 'undefined' && !isDeafened) {
+                    notificationSound.play().catch(e => {});
+                }
+
+                const statusSpan = document.querySelector(`#card-${tId} .transfer-status`);
+                const cancelBtn = document.getElementById(`cancel-btn-${tId}`);
+                if (statusSpan) {
+                    statusSpan.innerText = "GÖNDERİLDİ ✅";
+                    statusSpan.style.color = "#2ecc71";
+                }
+                if (cancelBtn) cancelBtn.remove();
+            }
         };
         reader.readAsArrayBuffer(slice);
     };
     readAndSend();
 };
 
-// 4. ALICI VERİ İŞLEME (Önizleme Dahil)
+// 4. ALICI VERİ İŞLEME (Alıcı Bildirim Sesi ve İptal Eden İsmi Eklendi)
 window.handleIncomingFileData = function(senderId, data) {
     let message = null;
     let isJson = false;
-
     try {
         if (typeof data === 'string') {
             message = JSON.parse(data);
@@ -125,8 +148,7 @@ window.handleIncomingFileData = function(senderId, data) {
                 const blob = new Blob(fData.receivedChunks, { type: fData.metadata.type });
                 const url = URL.createObjectURL(blob);
                 
-                // Alıcı için Resim Önizlemesi
-                if (fData.metadata.type && fData.metadata.type.startsWith('image/')) {
+                if (fData.metadata.type?.startsWith('image/')) {
                     const imgEl = document.getElementById(`preview-img-rec-${tId}`);
                     const contEl = document.getElementById(`preview-cont-rec-${tId}`);
                     if (imgEl && contEl) {
@@ -135,14 +157,22 @@ window.handleIncomingFileData = function(senderId, data) {
                     }
                 }
 
+                // --- ALIM BİTTİ (ALICI TARAFINDA) ---
                 const link = document.getElementById(`link-${tId}`);
-                if (link) {
-                    link.href = url;
-                    link.download = fData.metadata.name;
-                    link.style.display = 'block';
-                }
+                if (link) { link.href = url; link.download = fData.metadata.name; link.style.display = 'block'; }
                 const cont = document.getElementById(`cont-${tId}`);
                 if (cont) cont.style.display = 'none';
+
+                const statusDiv = document.querySelector(`#card-rec-${tId} .transfer-status`);
+                if (statusDiv) {
+                    statusDiv.innerText = "ALINDI ✅";
+                    statusDiv.style.color = "#2ecc71";
+                }
+
+                // ALICI BİLDİRİM SESİ
+                if (typeof notificationSound !== 'undefined' && !isDeafened) {
+                    notificationSound.play().catch(e => {});
+                }
                 
                 delete window.receivingFiles[tId];
                 delete window.activeIncomingTransferIds[senderId];
@@ -150,9 +180,19 @@ window.handleIncomingFileData = function(senderId, data) {
             }
         }
         else if (message.type === 'file-cancel') {
-            const tId = window.activeIncomingTransferIds[senderId];
-            const card = document.getElementById(`card-rec-${tId}`);
-            if (card) card.remove();
+            // --- ALICI EKRANINDA İPTAL EDENİN İSMİNİ GÖSTER ---
+            const tId = message.payload.tId;
+            const statusDiv = document.querySelector(`#card-rec-${tId} .transfer-status`);
+            const cont = document.getElementById(`cont-${tId}`);
+            
+            const senderName = (window.userNames && window.userNames[senderId]) || "Bir Kullanıcı";
+            
+            if (statusDiv) {
+                statusDiv.innerText = `${senderName.toUpperCase()} İPTAL ETTİ ❌`;
+                statusDiv.style.color = "#ff4757";
+            }
+            if (cont) cont.style.display = 'none'; 
+            
             delete window.receivingFiles[tId];
             delete window.activeIncomingTransferIds[senderId];
         }
@@ -173,8 +213,9 @@ function displayIncomingFile(senderId, fileName, fileSize, tId, fileType) {
     const div = document.createElement('div');
     div.id = `card-rec-${tId}`;
     div.className = 'message received file-message';
+    const name = (window.userNames && window.userNames[senderId]) || "Bir Kullanıcı";
     div.innerHTML = `
-        <div style="font-size:11px; color:#aaa; margin-bottom:8px; font-weight:bold;">${userNames[senderId] || "Biri"} GÖNDERİYOR</div>
+        <div class="transfer-status" style="font-size:11px; color:#aaa; margin-bottom:8px; font-weight:bold;">${name.toUpperCase()} GÖNDERİYOR</div>
         <div id="preview-cont-rec-${tId}" class="preview-container" style="display:none;">
             <img id="preview-img-rec-${tId}" class="preview-thumb">
         </div>

@@ -8,13 +8,15 @@ const path = require('path');
 const fileInput = document.getElementById('fileInput');
 const btnAttach = document.getElementById('btnAttach');
 
-// Giriş Sesi
+// Uygulama Sesleri
 let joinPath = path.join(__dirname, 'assets', 'RIZZ_effect.mp3');
 joinPath = joinPath.replace('app.asar', 'app.asar.unpacked');
 const joinSound = new Audio(joinPath);
 joinSound.volume = 1;
 const leaveSound = new Audio(path.join(__dirname, 'assets', 'cikis_effect.mp3').replace('app.asar', 'app.asar.unpacked'));
 leaveSound.volume = 1;
+const notificationSound = new Audio(path.join(__dirname, 'assets', 'notification_effect.mp3').replace('app.asar', 'app.asar.unpacked'));
+notificationSound.volume = 0.5;
 
 let socket;
 let localStream;
@@ -26,8 +28,8 @@ let audioContext;
 let outputAudioContext; 
 let peerGainNodes = {}; 
 
-let peers = {}; 
-let userNames = {}; 
+window.peers = {};
+window.userNames = {}; 
 let allUsers = []; 
 let isMicMuted = false;
 let isDeafened = false;
@@ -191,7 +193,10 @@ function initSocketConnection() {
             else if (data.type === 'signal') {
                 handleSignal(data.senderId, data.signal);
             }
-            else if (data.type === 'chat') addMessageToUI(data.sender, data.text, 'received', data.time);
+            else if (data.type === 'chat') {
+                addMessageToUI(data.sender, data.text, 'received', data.time);
+                if (!isDeafened) notificationSound.play().catch(e => {});
+            }
             else if (data.type === 'mic-status') updateMicStatusUI(data.senderId, data.isMuted); 
             else if (data.type === 'sound-effect') playLocalSound(data.effectName);
             else if (data.type === 'video-stopped') removeVideoElement(data.senderId); 
@@ -342,6 +347,7 @@ masterSlider.addEventListener('input', (e) => {
     masterVal.innerText = e.target.value + "%";
     document.querySelectorAll('audio').forEach(audio => audio.volume = e.target.value / 100);
     saveSetting('masterVolume', e.target.value); 
+    notificationSound.volume = e.target.value / 100;
 });
 
 // Ekran Paylaşımı
@@ -471,10 +477,18 @@ function playLocalSound(effectName) {
 // --- P2P MANTIĞI ---
 function createPeer(targetId, name, initiator) {
     if (targetId === myPeerId) return;
-    if (peers[targetId]) return; 
+    
+    // peers yerine window.peers kullanarak global erişim sağlıyoruz
+    if (!window.peers) window.peers = {}; 
+    if (window.peers[targetId]) return; 
 
     try {
-        const peer = new SimplePeer({ initiator: initiator, stream: processedStream, trickle: false, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } });
+        const peer = new SimplePeer({ 
+            initiator: initiator, 
+            stream: processedStream, 
+            trickle: false, 
+            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } 
+        });
         
         peer.on('signal', signal => { 
             if(socket && socket.readyState === WebSocket.OPEN) {
@@ -483,46 +497,66 @@ function createPeer(targetId, name, initiator) {
         });
         
         peer.on('stream', stream => {
-            if (stream.getVideoTracks().length > 0) addVideoElement(targetId, stream);
-            else { 
+            if (stream.getVideoTracks().length > 0) {
+                addVideoElement(targetId, stream);
+            } else { 
                 addAudioElement(targetId, stream); 
-                // BURASI: Ses geldiğinde durumu "Canlı" yapıyoruz
                 addUserUI(targetId, userNames[targetId] || name, true); 
                 attachVisualizer(stream, targetId); 
             }
         });
         
-        // renderer.js - createPeer fonksiyonu içerisindeki data eventi
         peer.on('data', data => { 
             try {
+                // Buffer verisini çözümlüyoruz
                 const strData = new TextDecoder("utf-8").decode(data);
                 const msg = JSON.parse(strData);
                 
-                if (msg.type === 'file-metadata' || msg.type === 'file-end') {
+                // DOSYA MESAJLARI: metadata, end ve cancel mesajlarını yönlendiriyoruz
+                if (msg.type === 'file-metadata' || msg.type === 'file-end' || msg.type === 'file-cancel') {
+                    console.log(`📡 P2P Sinyali Alındı: ${msg.type}`);
                     handleIncomingFileData(targetId, data);
                     return;
                 }
 
+                // CHAT MESAJLARI
                 if (msg.type === 'chat') {
                     addMessageToUI(msg.sender, msg.text, 'received', msg.time);
-                } else if (msg.type === 'mic-status') {
+                    if (!isDeafened && typeof notificationSound !== 'undefined') {
+                        notificationSound.play().catch(e => {});
+                    }
+                } 
+                // MİKROFON DURUMU
+                else if (msg.type === 'mic-status') {
                     updateMicStatusUI(targetId, msg.isMuted);
-                } else if (msg.type === 'sound-effect') {
+                } 
+                // SES EFEKTLERİ
+                else if (msg.type === 'sound-effect') {
                     playLocalSound(msg.effectName);
-                } else if (msg.type === 'video-stopped') {
+                } 
+                // VİDEO DURDURMA
+                else if (msg.type === 'video-stopped') {
                     removeVideoElement(targetId);
                 }
 
             } catch (e) {
+                // JSON değilse doğrudan dosya parçasıdır (binary)
                 handleIncomingFileData(targetId, data);
             }
         });
         
         peer.on('close', () => removePeer(targetId));
-        peer.on('error', err => { console.error(`Peer ${targetId} hatası:`, err); }); 
         
-        peers[targetId] = peer;
-    } catch (e) { console.error(e); }
+        peer.on('error', err => { 
+            console.error(`Peer ${targetId} hatası:`, err); 
+        }); 
+        
+        // Peer nesnesini global listeye kaydediyoruz
+        window.peers[targetId] = peer;
+        
+    } catch (e) { 
+        console.error("Peer oluşturma hatası:", e); 
+    }
 }
 
 function handleSignal(senderId, signal) {
