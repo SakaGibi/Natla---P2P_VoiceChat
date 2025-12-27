@@ -303,6 +303,12 @@ btnConnect.addEventListener('click', async () => {
         setTimeout(() => { inputUsername.disabled = false; inputUsername.focus(); }, 100);
         return;
     }
+
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showTemporaryStatus("Sunucuya henüz bağlanılamadı, lütfen bir saniye bekleyin...", "#f1c40f");
+        return;
+    }
+
     currentRoom = roomSelect.value;
     saveSetting('username', name);
     btnConnect.style.display = 'none'; 
@@ -517,10 +523,12 @@ function createPeer(targetId, name, initiator) {
         });
         
         peer.on('signal', signal => { 
-            if(socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: 'signal', targetId: targetId, signal: signal })); 
-            }
-        });
+        if(socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'signal', targetId: targetId, signal: signal })); 
+        } else {
+            console.warn("Sinyal gönderilemedi: Soket açık değil.");
+        }
+    });
         
         peer.on('stream', stream => {
             if (stream.getVideoTracks().length > 0) { addVideoElement(targetId, stream); } 
