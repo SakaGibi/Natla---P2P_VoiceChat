@@ -72,6 +72,8 @@ const micVal = document.getElementById('micVal');
 const masterSlider = document.getElementById('masterVolume');
 const masterVal = document.getElementById('masterVal');
 const isDev = !__dirname.includes('app.asar');
+btnConnect.disabled = true;
+btnConnect.innerText = "Sunucuya bağlanılıyor...";
 
 if (isDev) {
     CONFIG_PATH = path.join(__dirname, 'config.json');
@@ -201,16 +203,42 @@ function initSocketConnection() {
     }
     if(roomPreviewDiv) roomPreviewDiv.innerText = "Sunucuya bağlanılıyor...";
     socket = new WebSocket(configData.SIGNALING_SERVER);
-    socket.onopen = () => { console.log("Lobiye bağlanıldı."); };
-    socket.onerror = () => { 
-        if(roomPreviewDiv) roomPreviewDiv.innerText = "Sunucuya ulaşılamadı!";
-        // Hata durumunda 2 saniye sonra config'i sil ve reload at (Kullanıcı düzeltebilsin diye)
+    socket.onopen = () => {
+        console.log("Lobiye bağlanıldı.");
+        btnConnect.disabled = false;
+        btnConnect.innerText = "Bağlan";
+        showTemporaryStatus("Sunucuya bağlanıldı", "#2ecc71");
+    };    
+    socket.onerror = () => {
+        console.error("WebSocket hata aldı");
+
+        if (roomPreviewDiv) {
+            roomPreviewDiv.innerText = "Sunucuya bağlanılamadı!";
+            roomPreviewDiv.style.color = "#e74c3c";
+        }
+
+        btnConnect.disabled = true;
+        btnConnect.innerText = "Bağlanılamıyor";
+
         setTimeout(() => {
-            if(confirm("Sunucuya bağlanılamadı. Ayarları sıfırlayıp tekrar denemek ister misiniz?")) {
-                try { fs.unlinkSync(CONFIG_PATH); location.reload(); } catch(e){}
+            const retry = confirm(
+                "Sunucuya bağlanılamadı.\nAyarları sıfırlayıp yeniden yapılandırmak ister misiniz?"
+            );
+
+            if (retry) {
+                try {
+                    if (fs.existsSync(CONFIG_PATH)) {
+                        fs.unlinkSync(CONFIG_PATH);
+                    }
+                    location.reload();
+                } catch (e) {
+                    console.error("Config silinemedi:", e);
+                }
             }
         }, 2000);
     };
+
+
     socket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
@@ -256,9 +284,10 @@ function initSocketConnection() {
             else if (data.type === 'video-stopped') removeVideoElement(data.senderId); 
         } catch (e) { console.error(e); }
     };
-    socket.onerror = () => { if(roomPreviewDiv) roomPreviewDiv.innerText = "Sunucu hatası!"; };
     socket.onclose = () => { 
         if(roomPreviewDiv) roomPreviewDiv.innerText = "Bağlantı koptu.";
+        btnConnect.disabled = true;
+        btnConnect.innerText = "Bağlantı yok";
         if(isConnected) disconnectRoom(); 
     };
 }
