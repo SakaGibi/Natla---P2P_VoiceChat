@@ -54,6 +54,14 @@ const btnToggleMic = document.getElementById('btnToggleMic');
 const btnToggleSound = document.getElementById('btnToggleSound');
 const btnShareScreen = document.getElementById('btnShareScreen'); 
 
+// Settings & Modal Elements
+const btnSettings = document.getElementById('btnSettings');
+const btnCloseSettings = document.getElementById('btnCloseSettings');
+const passwordModal = document.getElementById('passwordModal');
+const serverInput = document.getElementById('serverInput');
+const keyInput = document.getElementById('keyInput');
+const btnSaveKey = document.getElementById('btnSaveKey');
+
 const streamModal = document.getElementById('streamModal');
 const largeVideoPlayer = document.getElementById('largeVideoPlayer');
 const btnCloseStream = document.getElementById('btnCloseStream');
@@ -64,7 +72,6 @@ btnCloseStream.addEventListener('click', () => {
     largeVideoPlayer.srcObject = null;
 });
 
-const btnTheme = document.getElementById('btnTheme');
 const micSelect = document.getElementById('micSelect');
 const speakerSelect = document.getElementById('speakerSelect'); 
 const micSlider = document.getElementById('micVolume');
@@ -72,6 +79,49 @@ const micVal = document.getElementById('micVal');
 const masterSlider = document.getElementById('masterVolume');
 const masterVal = document.getElementById('masterVal');
 const isDev = !__dirname.includes('app.asar');
+
+// --- BUTON ÖZELLİKLERİNİ ATA (Hata olsa bile bunlar çalışmalı) ---
+
+// Ayarlar (Çark) Butonu
+btnSettings.addEventListener('click', () => {
+    if (configData) {
+        serverInput.value = configData.SIGNALING_SERVER || "";
+        keyInput.value = configData.ACCESS_KEY || "";
+    }
+    passwordModal.style.display = 'flex';
+    setTimeout(() => serverInput.focus(), 50);
+});
+
+// Ayarlar Kapat (X) Butonu
+btnCloseSettings.addEventListener('click', () => {
+    passwordModal.style.display = 'none';
+});
+
+// Ayarları Kaydet Butonu
+btnSaveKey.addEventListener('click', () => {
+    const enteredServer = serverInput.value.trim();
+    const enteredKey = keyInput.value.trim();
+
+    if (!enteredServer || !enteredKey) {
+        return alert("Lütfen tüm alanları doldurun!");
+    }
+
+    const defaultConfig = { 
+        SIGNALING_SERVER: enteredServer, 
+        ACCESS_KEY: enteredKey 
+    };
+
+    try {
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
+        configData = defaultConfig;
+        passwordModal.style.display = 'none';
+        alert("Ayarlar kaydedildi. Yeniden bağlanılıyor...");
+        location.reload(); 
+    } catch (e) {
+        alert("Dosya yazma hatası: " + e.message);
+    }
+});
+
 btnConnect.disabled = true;
 btnConnect.innerText = "Sunucuya bağlanılıyor...";
 
@@ -91,46 +141,20 @@ if (isDev) {
 function connectWithConfig() {
     try {
         if (fs.existsSync(CONFIG_PATH)) {
-            // Dosya varsa oku ve bağlan
             configData = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
             console.log("✅ Config yüklendi:", configData.SIGNALING_SERVER);
-            initSocketConnection(); 
-        } else {
-            // Dosya yoksa MODAL'ı aç
-            const modal = document.getElementById('passwordModal');
-            const serverInput = document.getElementById('serverInput'); // Yeni input
-            const keyInput = document.getElementById('keyInput');
-            const btnSave = document.getElementById('btnSaveKey');
-
-            if (modal) {
-                modal.style.display = 'flex';
-                
-                btnSave.onclick = () => {
-                    const enteredServer = serverInput.value.trim();
-                    const enteredKey = keyInput.value.trim();
-
-                    if (!enteredServer || !enteredKey) {
-                        return alert("Lütfen sunucu adresi ve anahtarı eksiksiz girin!");
-                    }
-
-                    // Kullanıcının girdiği bilgilerle config oluştur
-                    const defaultConfig = { 
-                        SIGNALING_SERVER: enteredServer, 
-                        ACCESS_KEY: enteredKey 
-                    };
-
-                    try {
-                        fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
-                        configData = defaultConfig;
-                        
-                        modal.style.display = 'none';
-                        alert("Ayarlar kaydedildi. Bağlanılıyor...");
-                        initSocketConnection();
-                    } catch (e) {
-                        alert("Dosya yazma hatası: " + e.message);
-                    }
-                };
+            
+            // initSocketConnection'da URL hatası olsa bile catch bloğu yakalar, JS durmaz
+            try {
+                initSocketConnection(); 
+            } catch (wsError) {
+                console.error("WebSocket Başlatma Hatası:", wsError);
             }
+        } else {
+            serverInput.value = "";
+            keyInput.value = "";
+            passwordModal.style.display = 'flex';
+            serverInput.focus();
         }
     } catch (error) {
         console.error("Config hatası:", error);
@@ -141,7 +165,7 @@ function connectWithConfig() {
 window.onload = () => {
     loadSettings();
     getDevices(); 
-    connectWithConfig(); // initSocketConnection'ı buradan sildik, çünkü yukarıda çağırıyoruz
+    connectWithConfig();
 };
 
 // --- BİLDİRİM SİSTEMİ ---
@@ -202,42 +226,25 @@ function initSocketConnection() {
         return;
     }
     if(roomPreviewDiv) roomPreviewDiv.innerText = "Sunucuya bağlanılıyor...";
-    socket = new WebSocket(configData.SIGNALING_SERVER);
-    socket.onopen = () => {
-        console.log("Lobiye bağlanıldı.");
-        btnConnect.disabled = false;
-        btnConnect.innerText = "Bağlan";
-        showTemporaryStatus("Sunucuya bağlanıldı", "#2ecc71");
-    };    
-    socket.onerror = () => {
-        console.error("WebSocket hata aldı");
-
-        if (roomPreviewDiv) {
-            roomPreviewDiv.innerText = "Sunucuya bağlanılamadı!";
+    
+    // Geçersiz URL (örneğin sonunda 'a' olan) new WebSocket() anında hata fırlatır
+    try {
+        socket = new WebSocket(configData.SIGNALING_SERVER);
+    } catch (e) {
+        console.error("Kritik WebSocket Hatası (Invalid URL):", e.message);
+        if(roomPreviewDiv) {
+            roomPreviewDiv.innerText = "Hatalı Sunucu Adresi!";
             roomPreviewDiv.style.color = "#e74c3c";
         }
+        return; // Fonksiyonun geri kalanını çalıştırma
+    }
 
-        btnConnect.disabled = true;
-        btnConnect.innerText = "Bağlanılamıyor";
-
-        setTimeout(() => {
-            const retry = confirm(
-                "Sunucuya bağlanılamadı.\nAyarları sıfırlayıp yeniden yapılandırmak ister misiniz?"
-            );
-
-            if (retry) {
-                try {
-                    if (fs.existsSync(CONFIG_PATH)) {
-                        fs.unlinkSync(CONFIG_PATH);
-                    }
-                    location.reload();
-                } catch (e) {
-                    console.error("Config silinemedi:", e);
-                }
-            }
-        }, 2000);
+    socket.onopen = () => { 
+        console.log("Lobiye bağlanıldı.");
+        btnConnect.disabled = false;
+        btnConnect.innerText = "Katıl";
+        showTemporaryStatus("Sunucu bağlantısı aktif", "#2ecc71");
     };
-
 
     socket.onmessage = (event) => {
         try {
@@ -272,10 +279,8 @@ function initSocketConnection() {
             else if (data.type === 'signal') { handleSignal(data.senderId, data.signal); }
             else if (data.type === 'chat') {
                 addMessageToUI(data.sender, data.text, 'received', data.time);
-    
-                // Mesaj geldiğinde eğer kulaklık kapalı (deafened) değilse sesi çal
                 if (!isDeafened) {
-                    notificationSound.currentTime = 0; // Sesi başa sar (üst üste gelirse çalsın)
+                    notificationSound.currentTime = 0;
                     notificationSound.play().catch(e => console.error("Ses çalma hatası:", e));
                 }
             }
@@ -284,6 +289,18 @@ function initSocketConnection() {
             else if (data.type === 'video-stopped') removeVideoElement(data.senderId); 
         } catch (e) { console.error(e); }
     };
+
+    socket.onerror = () => {
+        if(roomPreviewDiv) roomPreviewDiv.innerText = "Sunucuya ulaşılamadı!";
+        btnConnect.disabled = true;
+        btnConnect.innerText = "Bağlanılamıyor";
+        setTimeout(() => {
+            if(confirm("Sunucuya bağlanılamadı. Ayarları sıfırlayıp tekrar denemek ister misiniz?")) {
+                try { fs.unlinkSync(CONFIG_PATH); location.reload(); } catch(e){}
+            }
+        }, 2000);
+    };
+
     socket.onclose = () => { 
         if(roomPreviewDiv) roomPreviewDiv.innerText = "Bağlantı koptu.";
         btnConnect.disabled = true;
@@ -326,15 +343,15 @@ async function getDevices() {
 
 // --- BAĞLANMA ---
 btnConnect.addEventListener('click', async () => {
-    const name = inputUsername.value;
+    const name = inputUsername.value.trim();
     if(!name) {
         alert("Lütfen bir isim girin!");
-        setTimeout(() => { inputUsername.disabled = false; inputUsername.focus(); }, 100);
+        inputUsername.focus();
         return;
     }
 
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-        showTemporaryStatus("Sunucuya henüz bağlanılamadı, lütfen bir saniye bekleyin...", "#f1c40f");
+        showTemporaryStatus("Sunucu henüz hazır değil, lütfen bekleyin...", "#f1c40f");
         return;
     }
 
@@ -348,6 +365,7 @@ btnConnect.addEventListener('click', async () => {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     outputAudioContext = new (window.AudioContext || window.webkitAudioContext)();
     if (outputAudioContext.state === 'suspended') await outputAudioContext.resume();
+    
     if (speakerSelect && speakerSelect.value && outputAudioContext.setSinkId) {
             outputAudioContext.setSinkId(speakerSelect.value).catch(e => {});
     }
@@ -356,17 +374,22 @@ btnConnect.addEventListener('click', async () => {
         const selectedMicId = micSelect ? micSelect.value : null;
         const constraints = { audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true, video: false };
         const rawStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
         sourceNode = audioContext.createMediaStreamSource(rawStream);
         micGainNode = audioContext.createGain();
         micGainNode.gain.value = micSlider.value / 100; 
+        
         const destination = audioContext.createMediaStreamDestination();
         sourceNode.connect(micGainNode);
         micGainNode.connect(destination);
+        
         localStream = rawStream; 
         processedStream = destination.stream; 
+        
         msgInput.disabled = false;
         btnSend.disabled = false;
         btnShareScreen.disabled = false;
+        
         userNames["me"] = name + " (Ben)";
         addUserUI("me", userNames["me"], true);
         attachVisualizer(processedStream, "me"); 
@@ -394,24 +417,13 @@ function saveSetting(key, value) { localStorage.setItem(key, value); }
 function loadSettings() {
     const savedName = localStorage.getItem('username');
     if (savedName && inputUsername) inputUsername.value = savedName;
-    loadTheme();
 }
-function loadTheme() {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light') { document.body.classList.add('light-theme'); btnTheme.innerText = '🌙'; }
-    else { btnTheme.innerText = '☀️'; }
-}
-btnTheme.addEventListener('click', () => {
-    document.body.classList.toggle('light-theme');
-    const isLight = document.body.classList.contains('light-theme');
-    btnTheme.innerText = isLight ? '🌙' : '☀️';
-    saveSetting('theme', isLight ? 'light' : 'dark');
-});
 
 micSlider.addEventListener('input', (e) => {
     micVal.innerText = e.target.value + "%";
     if (micGainNode) micGainNode.gain.value = e.target.value / 100; 
 });
+
 masterSlider.addEventListener('input', (e) => {
     masterVal.innerText = e.target.value + "%";
     document.querySelectorAll('audio').forEach(audio => audio.volume = e.target.value / 100);
@@ -463,6 +475,7 @@ function addMessageToUI(sender, text, type, time = null) {
     chatHistory.appendChild(div);
     chatHistory.scrollTop = chatHistory.scrollHeight; 
 }
+
 function sendChat() {
     const text = msgInput.value.trim();
     if (!text || !isConnected) return;
@@ -488,6 +501,7 @@ function setMicState(mute) {
     if (isMicMuted) { btnToggleMic.innerText = "🎤✖"; btnToggleMic.style.backgroundColor = "#8b281d"; } 
     else { btnToggleMic.innerText = "🎤"; btnToggleMic.style.backgroundColor = "#397251"; }
 }
+
 btnToggleMic.addEventListener('click', () => { if (isDeafened) return alert("Hoparlör kapalı!"); setMicState(!isMicMuted); });
 btnToggleSound.addEventListener('click', () => {
     isDeafened = !isDeafened;
@@ -552,12 +566,10 @@ function createPeer(targetId, name, initiator) {
         });
         
         peer.on('signal', signal => { 
-        if(socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'signal', targetId: targetId, signal: signal })); 
-        } else {
-            console.warn("Sinyal gönderilemedi: Soket açık değil.");
-        }
-    });
+            if(socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'signal', targetId: targetId, signal: signal })); 
+            }
+        });
         
         peer.on('stream', stream => {
             if (stream.getVideoTracks().length > 0) { addVideoElement(targetId, stream); } 
@@ -568,7 +580,6 @@ function createPeer(targetId, name, initiator) {
             }
         });
         
-        // renderer.js içindeki peer.on('data') kısmını bul ve şu şekilde güncelle:
         peer.on('data', data => { 
             try {
                 const strData = new TextDecoder("utf-8").decode(data);
@@ -581,8 +592,6 @@ function createPeer(targetId, name, initiator) {
                 
                 if (msg.type === 'chat') { 
                     addMessageToUI(msg.sender, msg.text, 'received', msg.time); 
-                    
-                    // --- EKSİK OLAN KISIM BURASIYDI ---
                     if (!isDeafened) {
                         notificationSound.currentTime = 0;
                         notificationSound.play().catch(e => console.error("Ses çalma hatası:", e));
@@ -678,10 +687,7 @@ function addAudioElement(id, stream) {
     aud.controls = false;      
 
     document.getElementById('audioContainer').appendChild(aud);
-
-    aud.play().catch(e => {
-        console.error("Oto oynatma hatası:", e);
-    });
+    aud.play().catch(e => { console.error("Oto oynatma hatası:", e); });
 }
 
 function addVideoElement(id, stream) {

@@ -152,8 +152,36 @@ body {
 /* --- HEADER VE STATUS --- */
 .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0; }
 h1 { margin: 0; font-size: 20px; }
-#btnTheme { flex: none; width: 32px; height: 32px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; background: transparent; border: 1px solid var(--border-color); color: var(--text-main); margin-left: 10px; }
+#btnSettings { 
+    flex: none; 
+    width: 32px; 
+    height: 32px; 
+    border-radius: 50%; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    cursor: pointer; 
+    background: transparent; 
+    border: 1px solid var(--border-color); 
+    color: var(--text-main); 
+    margin-left: 10px; 
+    font-size: 18px;
+    transition: transform 0.3s ease;
+}
 
+#btnSettings:hover {
+    transform: rotate(45deg);
+    background: var(--input-bg);
+}
+
+#btnCloseSettings:hover {
+    color: white !important;
+}
+
+/* Light theme kısmındaki buton rengini de güncelleyelim (Opsiyonel) */
+body.light-theme #btnSettings {
+    color: #333;
+}
 #status { padding: 8px; margin-bottom: 10px; border-radius: 6px; background: var(--status-bg); color: var(--status-text); font-size: 13px; font-weight: 600; text-align: center; flex-shrink: 0; }
 
 
