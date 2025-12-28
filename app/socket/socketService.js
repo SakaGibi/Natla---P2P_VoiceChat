@@ -3,6 +3,7 @@ const state = require('../state/appState');
 const dom = require('../ui/dom');
 
 let socket = null;
+let messageQueue = []; 
 
 /**
  * Sunucuya bağlantı başlatır
@@ -13,6 +14,12 @@ function connect(url) {
         return;
     }
 
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+        return;
+    }
+
+    console.log("🔌 Sunucuya bağlanılıyor:", url);
+
     try {
         socket = new WebSocket(url);
     } catch (e) {
@@ -21,11 +28,26 @@ function connect(url) {
     }
 
     socket.onopen = () => {
-        dom.btnConnect.disabled = false;
-        dom.btnConnect.innerText = "Katıl";
+        console.log("✅ WebSocket Bağlantısı Kuruldu!");
         
-        const roomPreview = require('../ui/roomPreview');
-        roomPreview.showTemporaryStatus("Sunucu bağlantısı aktif", "#2ecc71");
+        if (dom.btnConnect) {
+            dom.btnConnect.disabled = false;
+            dom.btnConnect.innerText = "Katıl";
+        }
+        
+        // Kuyruktaki mesajları gönder
+        if (messageQueue.length > 0) {
+            console.log(`📨 Kuyrukta bekleyen ${messageQueue.length} mesaj gönderiliyor...`);
+            while (messageQueue.length > 0) {
+                const msg = messageQueue.shift();
+                send(msg);
+            }
+        }
+
+        try {
+            const roomPreview = require('../ui/roomPreview');
+            roomPreview.showTemporaryStatus("Sunucu bağlantısı aktif", "#2ecc71");
+        } catch (e) {}
     };
 
     socket.onmessage = (event) => {
@@ -39,17 +61,15 @@ function connect(url) {
 
     socket.onerror = (err) => {
         console.error("❌ WebSocket Hatası:", err);
-        dom.btnConnect.disabled = true;
-        dom.btnConnect.innerText = "Bağlanılamıyor";
+        if (dom.btnConnect) {
+            dom.btnConnect.disabled = true;
+            dom.btnConnect.innerText = "Bağlanılamıyor";
+        }
     };
 
-    socket.onclose = () => {
-        // Eğer kullanıcı bağlıyken (odadayken) koparsa uyarı ver
-        if (state.isConnected) {
-            console.warn("🔌 Sunucu bağlantısı kesildi.");
-            alert("Sunucu bağlantısı koptu!");
-            // location.reload(); // Hata ayıklama için kapalı tutuyoruz, her şey düzelince açabilirsin
-        }
+    socket.onclose = (event) => {
+        console.warn(`🔌 Sunucu bağlantısı kesildi. Kod: ${event.code}`);
+        state.isConnected = false;
     };
 }
 
@@ -61,46 +81,72 @@ function handleMessage(data) {
     const chatService = require('../chat/chatService');
     const userList = require('../ui/userList');
     const audioEngine = require('../audio/audioEngine');
-    const roomPreview = require('../ui/roomPreview');
-
-    // Hata ayıklama için gelen her mesajı konsola bas
+    
+    let roomPreview = null;
+    try { roomPreview = require('../ui/roomPreview'); } catch(e){}
 
     switch (data.type) {
         case 'error':
-            // Sunucunun gönderdiği yetkisiz erişim vb. hataları yakalar
             alert("Sunucu Hatası: " + data.message);
-            console.error("🚫 Sunucu Erişimi Reddetti:", data.message);
             break;
 
-        case 'me':
+        case 'me': 
             state.myPeerId = data.id;
+            console.log("🆔 Kimlik alındı:", data.id);
             break;
 
+        case 'room-users': 
         case 'user-list':
+            console.log("👥 Kullanıcı listesi alındı:", data.users);
             state.allUsers = data.users;
-            roomPreview.updateRoomPreview();
+            
+            if (roomPreview) roomPreview.updateRoomPreview();
+            
             if (state.isConnected) {
                 data.users.forEach(u => { 
-                    if (u.id !== state.myPeerId) state.userNames[u.id] = u.name; 
+                    if (u.id !== state.myPeerId) {
+                        state.userNames[u.id] = u.name;
+                        userList.addUserUI(u.id, u.name, true);
+                        
+                        // [ÇÖZÜM]: Sadece ID'si benimkinden küçük olanlara ben başlatırım.
+                        // Büyük olanlar bana başlatacak, ben bekleyeceğim.
+                        if (shouldIInitiate(state.myPeerId, u.id)) {
+                            console.log(`🚀 Başlatıcı benim -> ${u.name}`);
+                            peerService.createPeer(u.id, u.name, true);
+                        } else {
+                            console.log(`⏳ Bekliyorum -> ${u.name} başlatacak.`);
+                        }
+                    }
                 });
             }
             break;
 
         case 'user-joined':
             if (data.id === state.myPeerId) return;
+            console.log("👋 Yeni kullanıcı:", data.name);
+            
             state.userNames[data.id] = data.name;
-            userList.addUserUI(data.id, data.name, false);
+            userList.addUserUI(data.id, data.name, true);
             audioEngine.playSystemSound('join');
-            // Yeni biri geldiğinde WebRTC bağlantısını başlat
-            peerService.createPeer(data.id, data.name, true);
+            
+            // [ÇÖZÜM]: Burada da aynı ID kontrolü
+            if (shouldIInitiate(state.myPeerId, data.id)) {
+                console.log(`🚀 Başlatıcı benim -> ${data.name}`);
+                peerService.createPeer(data.id, data.name, true);
+            } else {
+                console.log(`⏳ Bekliyorum -> ${data.name} başlatacak.`);
+            }
             break;
 
         case 'user-left':
+            console.log("🚪 Kullanıcı ayrıldı:", data.id);
             audioEngine.playSystemSound('leave');
             peerService.removePeer(data.id);
             break;
 
         case 'signal':
+            // Sinyal geldiyse peerService.handleSignal devreye girer.
+            // Eğer biz "Bekleyen" taraf isek, handleSignal bizim için peer'ı "Initiator: false" olarak yaratır.
             peerService.handleSignal(data.senderId, data.signal);
             break;
 
@@ -114,22 +160,35 @@ function handleMessage(data) {
             break;
 
         case 'sound-effect':
-            audioEngine.playLocalSound(data.effectName);
+            if (data.senderId !== state.myPeerId) {
+                audioEngine.playLocalSound(data.effectName);
+            }
             break;
 
         case 'video-stopped':
             userList.removeVideoElement(data.senderId);
             break;
+
+        default:
+            console.warn("⚠️ Bilinmeyen Mesaj Tipi:", data.type);
+            break;
     }
+}
+
+/**
+ * [ÇÖZÜM] Çarpışma Önleyici Mantık
+ * İki ID'yi string olarak karşılaştırır.
+ * Alfabetik/Sayısal olarak büyük olan taraf bağlantıyı başlatır.
+ */
+function shouldIInitiate(myId, targetId) {
+    if (!myId || !targetId) return false;
+    return myId > targetId;
 }
 
 /**
  * Odaya katılma isteği gönderir
  */
 function joinRoom(name, room) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    
-    // Anahtarı alırken varsa başındaki/sonundaki boşlukları temizle
     const accessKey = state.configData && state.configData.ACCESS_KEY 
                       ? state.configData.ACCESS_KEY.trim() 
                       : null;
@@ -141,18 +200,29 @@ function joinRoom(name, room) {
         key: accessKey 
     };
     
-    console.log("📤 Sunucuya gönderilen Join paketi:", payload);
-    socket.send(JSON.stringify(payload));
+    send(payload);
 }
 
 /**
- * Genel veri gönderme fonksiyonu (P2P dışı, sunucuya doğrudan mesaj)
+ * Güvenli veri gönderme fonksiyonu
  */
 function send(payload) {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify(payload));
+    if (!socket) {
+        messageQueue.push(payload);
+        return;
+    }
+    if (socket.readyState === WebSocket.CONNECTING) {
+        messageQueue.push(payload);
+        return;
+    }
+    if (socket.readyState === WebSocket.OPEN) {
+        try {
+            socket.send(JSON.stringify(payload));
+        } catch (e) {
+            console.error("Mesaj gönderme hatası:", e);
+        }
     } else {
-        console.warn("⚠️ Mesaj gönderilemedi, soket kapalı.");
+        console.error("❌ Soket kapalı, mesaj gönderilemedi:", payload.type);
     }
 }
 
