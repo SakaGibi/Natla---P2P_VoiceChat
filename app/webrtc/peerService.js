@@ -37,12 +37,26 @@ function createPeer(targetId, name, initiator) {
 
         // --- MEDYA AKIŞI ---
         peer.on('stream', stream => {
-            if (stream.getVideoTracks().length > 0) { 
-                userList.addVideoElement(targetId, stream); 
-            } else { 
+            console.log(`📡 ${targetId} kullanıcısından akış alındı.`);
+                
+            if (stream.getVideoTracks().length > 0) {
+                // Bu bir ekran paylaşımı akışıdır
+                const userList = require('../ui/userList');
+                userList.addVideoElement(targetId, stream);
+            } else {
+                // Bu bir mikrofon ses akışıdır
+                const visualizer = require('../audio/visualizer');
+                const userList = require('../ui/userList');
+                const audioEngine = require('../audio/audioEngine');
+                
+                // 1. Sesi hoparlöre ver
                 audioEngine.addAudioElement(targetId, stream); 
-                userList.addUserUI(targetId, state.userNames[targetId] || name, true); 
-                audioEngine.attachVisualizer(stream, targetId); 
+                
+                // 2. UI kartını oluştur veya güncelle
+                userList.addUserUI(targetId, state.userNames[targetId] || "Biri", true);
+                
+                // 3. Ses barını akışa bağla
+                visualizer.attachVisualizer(stream, targetId); 
             }
         });
 

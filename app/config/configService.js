@@ -4,20 +4,18 @@ const path = require('path');
 const state = require('../state/appState');
 const dom = require('../ui/dom');
 
-// --- YOL TANIMLAMALARI ---
-const isDev = !require('electron').remote ? !require('electron').app.isPackaged : false; 
-// Not: renderer tarafında isPackaged kontrolü için alternatif bir yöntem
+// --- HATA DÜZELTME: Renderer tarafında isPackaged kontrolü ---
 const isActuallyDev = !__dirname.includes('app.asar');
 
 let CONFIG_PATH;
 
 if (isActuallyDev) {
-    // Geliştirme aşamasında proje klasöründeki config.json
+    // Geliştirme aşamasında (app/ klasörü içindeyiz, bir tık yukarı çıkıyoruz)
     CONFIG_PATH = path.join(__dirname, '..', '..', 'config.json');
 } else {
     // Paketlendiğinde kullanıcı verileri klasörü (AppData/Roaming/Natla)
     const appData = process.env.APPDATA || (process.platform == 'darwin' ? process.env.HOME + '/Library/Preferences' : process.env.HOME + "/.local/share");
-    const appDir = path.join(appData, 'Natla'); 
+    const appDir = path.join(appData, 'Natla');
     
     if (!fs.existsSync(appDir)){
         try { fs.mkdirSync(appDir, { recursive: true }); } catch(e) { console.error("Klasör oluşturulamadı", e); }

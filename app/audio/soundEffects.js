@@ -1,13 +1,12 @@
-// soundEffects.js - Soundpad ve Efekt Yönetimi
+// app/audio/soundEffects.js
 const state = require('../state/appState');
-const audioEngine = require('./audioEngine');
+const socketService = require('../socket/socketService');
+const audioEngine = require('./audioEngine'); // AudioEngine'i dahil ediyoruz
+const dom = require('../ui/dom');
 
-/**
- * Orijinal efekt listesi
- */
-const effectList = [
-    { file: 'fahh_effect', title: 'Fahh Efekti', short: 'fahh'},  
-    { file: 'ahhhhhhh_effect', title: 'Ahhhhhhh Efekti', short: 'aaah'},    
+const soundList = [
+    { file: 'fahh_effect', title: 'Fahh Efekti', short: 'fahh'},   
+    { file: 'ahhhhhhh_effect', title: 'Ahhhhhhh Efekti', short: 'aaah'},     
     { file: 'besili_camis_effect', title: 'besili camış', short: 'besili camış' },     
     { file: 'denyo_dangalak_effect', title: 'denyo mu dangalak mı?', short: 'denyo' },
     { file: 'deplasman_yasağı_effect', title: 'deplasman yarağı', short: 'dep. yasak' },
@@ -24,45 +23,35 @@ const effectList = [
     { file: 'aglama_oyna_Effect', title: 'ağlama hade oyna', short: 'ağlama oyna' }
 ];
 
-/**
- * UI üzerindeki soundpad butonlarını hazırlar
- */
 function initSoundpad() {
     const buttons = document.querySelectorAll('.soundpad-btn');
     
     buttons.forEach((btn, index) => {
-        const effectInfo = effectList[index] || { file: `effect_${index+1}`, title: `${index+1}`, short: `${index+1}` };
+        const soundData = soundList[index];
         
-        // Buton yazılarını ve ipuçlarını ayarla
-        btn.innerText = effectInfo.short;
-        btn.title = effectInfo.title;
+        if (soundData) {
+            btn.innerText = soundData.short;
+            btn.title = soundData.title;
 
-        // Tıklama olayını ekle
-        btn.addEventListener('click', () => {
-            if (!state.isConnected) return; 
+            btn.onclick = () => {
+                // 1. Durum Kontrolleri: Bağlı mıyız? Sesler kapalı mı?
+                if (!state.isConnected) return;
+                if (state.isDeafened) return; // KRİTİK: Eğer sağırlaştırılmışsa çalma
 
-            // 1. Diğer kullanıcılara bildir
-            const peerService = require('../webrtc/peerService');
-            peerService.broadcast({ 
-                type: 'sound-effect', 
-                effectName: effectInfo.file 
-            });
+                const fileName = soundData.file + ".mp3";
 
-            // 2. Kendi hoparlöründe çal
-            audioEngine.playLocalSound(effectInfo.file);
-        });
+                // 2. Kendi hoparlöründe çal (Artık audioEngine üzerinden yapıyoruz)
+                // audioEngine.playLocalSound zaten isDeafened kontrolü ve doğru yol mantığına sahip
+                audioEngine.playLocalSound(fileName); 
+
+                // 3. Sunucuya (Diğerlerine) gönder
+                socketService.send({
+                    type: 'sound-effect',
+                    effectName: fileName
+                });
+            };
+        }
     });
 }
 
-/**
- * Dışarıdan bir efekt tetiklemek istenirse kullanılır
- */
-function triggerEffect(effectName) {
-    audioEngine.playLocalSound(effectName);
-}
-
-module.exports = {
-    initSoundpad,
-    triggerEffect,
-    effectList
-};
+module.exports = { initSoundpad };

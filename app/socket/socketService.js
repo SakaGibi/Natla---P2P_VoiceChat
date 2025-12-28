@@ -2,9 +2,6 @@
 const state = require('../state/appState');
 const dom = require('../ui/dom');
 
-// Diğer servisler (Döngüsel bağımlılığı önlemek için ihtiyaç duyulduğunda require edilecekler)
-// Not: peerService ve chatService gibi modüller aşağıda fonksiyon içinde çağrılacaktır.
-
 let socket = null;
 
 /**
@@ -19,16 +16,14 @@ function connect(url) {
     try {
         socket = new WebSocket(url);
     } catch (e) {
-        console.error("WebSocket Bağlantı Hatası:", e.message);
+        console.error("❌ WebSocket Başlatma Hatası:", e.message);
         return;
     }
 
     socket.onopen = () => {
-        console.log("Lobiye bağlanıldı.");
         dom.btnConnect.disabled = false;
         dom.btnConnect.innerText = "Katıl";
         
-        // UI Yardımı: roomPreview'ı güncelle (Modül 15'te detaylanacak)
         const roomPreview = require('../ui/roomPreview');
         roomPreview.showTemporaryStatus("Sunucu bağlantısı aktif", "#2ecc71");
     };
@@ -38,19 +33,22 @@ function connect(url) {
             const data = JSON.parse(event.data);
             handleMessage(data);
         } catch (e) {
-            console.error("Mesaj ayrıştırma hatası:", e);
+            console.error("⚠️ Mesaj ayrıştırma hatası:", e);
         }
     };
 
-    socket.onerror = () => {
+    socket.onerror = (err) => {
+        console.error("❌ WebSocket Hatası:", err);
         dom.btnConnect.disabled = true;
         dom.btnConnect.innerText = "Bağlanılamıyor";
     };
 
     socket.onclose = () => {
+        // Eğer kullanıcı bağlıyken (odadayken) koparsa uyarı ver
         if (state.isConnected) {
+            console.warn("🔌 Sunucu bağlantısı kesildi.");
             alert("Sunucu bağlantısı koptu!");
-            location.reload();
+            // location.reload(); // Hata ayıklama için kapalı tutuyoruz, her şey düzelince açabilirsin
         }
     };
 }
@@ -65,7 +63,19 @@ function handleMessage(data) {
     const audioEngine = require('../audio/audioEngine');
     const roomPreview = require('../ui/roomPreview');
 
+    // Hata ayıklama için gelen her mesajı konsola bas
+
     switch (data.type) {
+        case 'error':
+            // Sunucunun gönderdiği yetkisiz erişim vb. hataları yakalar
+            alert("Sunucu Hatası: " + data.message);
+            console.error("🚫 Sunucu Erişimi Reddetti:", data.message);
+            break;
+
+        case 'me':
+            state.myPeerId = data.id;
+            break;
+
         case 'user-list':
             state.allUsers = data.users;
             roomPreview.updateRoomPreview();
@@ -76,15 +86,12 @@ function handleMessage(data) {
             }
             break;
 
-        case 'me':
-            state.myPeerId = data.id;
-            break;
-
         case 'user-joined':
             if (data.id === state.myPeerId) return;
             state.userNames[data.id] = data.name;
             userList.addUserUI(data.id, data.name, false);
             audioEngine.playSystemSound('join');
+            // Yeni biri geldiğinde WebRTC bağlantısını başlat
             peerService.createPeer(data.id, data.name, true);
             break;
 
@@ -122,20 +129,30 @@ function handleMessage(data) {
 function joinRoom(name, room) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     
-    socket.send(JSON.stringify({ 
+    // Anahtarı alırken varsa başındaki/sonundaki boşlukları temizle
+    const accessKey = state.configData && state.configData.ACCESS_KEY 
+                      ? state.configData.ACCESS_KEY.trim() 
+                      : null;
+
+    const payload = { 
         type: 'join', 
         name: name,
         room: room,
-        key: state.configData.ACCESS_KEY
-    }));
+        key: accessKey 
+    };
+    
+    console.log("📤 Sunucuya gönderilen Join paketi:", payload);
+    socket.send(JSON.stringify(payload));
 }
 
 /**
- * Genel veri gönderme fonksiyonu
+ * Genel veri gönderme fonksiyonu (P2P dışı, sunucuya doğrudan mesaj)
  */
 function send(payload) {
     if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(payload));
+    } else {
+        console.warn("⚠️ Mesaj gönderilemedi, soket kapalı.");
     }
 }
 

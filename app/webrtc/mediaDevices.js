@@ -1,88 +1,56 @@
-// mediaDevices.js - Cihaz Listeleme ve Yönetimi
+// app/webrtc/mediaDevices.js
 const dom = require('../ui/dom');
-
-
-// Mevcut ses giriş ve çıkış cihazlarını listeler ve UI'ı günceller
+const state = require('../state/appState');
+const audioEngine = require('../audio/audioEngine'); // AudioEngine'i ekledik
 
 async function getDevices() {
     try {
-        // İzinleri tetiklemek için geçici bir akış başlat ve hemen durdur
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(e => {
-            console.warn("Mikrofon izni verilmedi veya cihaz bulunamadı.");
-        });
-        if (stream) stream.getTracks().forEach(track => track.stop());
-
+        // İzinleri tetiklemek için önce cihazları iste
+        // (Eğer etiketler boş gelirse initLocalStream zaten izin isteyecek)
         const devices = await navigator.mediaDevices.enumerateDevices();
+        
+        // Listeleri temizle
+        dom.micSelect.innerHTML = '';
+        dom.speakerSelect.innerHTML = '';
+
         const audioInputs = devices.filter(d => d.kind === 'audioinput');
         const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
 
-        // Mikrofon listesini güncelle
-        if (dom.micSelect) {
-            dom.micSelect.innerHTML = '<option value="">Varsayılan Mikrofon</option>';
-            audioInputs.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d.deviceId;
-                opt.text = d.label || `Mikrofon ${dom.micSelect.length}`;
-                dom.micSelect.appendChild(opt);
-            });
-            
-            // Kayıtlı tercihi yükle
-            const savedMic = localStorage.getItem('selectedMicId');
-            if (savedMic) dom.micSelect.value = savedMic;
+        // Mikrofonları Listele
+        audioInputs.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.text = device.label || `Mikrofon ${dom.micSelect.length + 1}`;
+            dom.micSelect.appendChild(option);
+        });
 
-            // Seçim değiştiğinde kaydet
-            dom.micSelect.onchange = () => {
-                localStorage.setItem('selectedMicId', dom.micSelect.value);
-            };
+        // Hoparlörleri Listele
+        audioOutputs.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.text = device.label || `Hoparlör ${dom.speakerSelect.length + 1}`;
+            dom.speakerSelect.appendChild(option);
+        });
+
+        // Varsa kayıtlı seçimi geri yükle
+        const savedMic = localStorage.getItem('selectedMic');
+        const savedSpeaker = localStorage.getItem('selectedSpeaker');
+
+        if (savedMic && Array.from(dom.micSelect.options).some(o => o.value === savedMic)) {
+            dom.micSelect.value = savedMic;
+        }
+        if (savedSpeaker && Array.from(dom.speakerSelect.options).some(o => o.value === savedSpeaker)) {
+            dom.speakerSelect.value = savedSpeaker;
         }
 
-        // Hoparlör listesini güncelle
-        if (dom.speakerSelect) {
-            dom.speakerSelect.innerHTML = '<option value="">Varsayılan Hoparlör</option>';
-            audioOutputs.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d.deviceId;
-                opt.text = d.label || `Hoparlör ${dom.speakerSelect.length}`;
-                dom.speakerSelect.appendChild(opt);
-            });
-
-            // Kayıtlı tercihi yükle
-            const savedSpeaker = localStorage.getItem('selectedSpeakerId');
-            if (savedSpeaker) dom.speakerSelect.value = savedSpeaker;
-
-            // Seçim değiştiğinde kaydet
-            dom.speakerSelect.onchange = () => {
-                localStorage.setItem('selectedSpeakerId', dom.speakerSelect.value);
-                // Eğer aktif bir çıkış bağlamı varsa hoparlörü değiştir
-                const state = require('../state/appState');
-                if (state.outputAudioContext && state.outputAudioContext.setSinkId) {
-                    state.outputAudioContext.setSinkId(dom.speakerSelect.value).catch(e => {
-                        console.error("Hoparlör değiştirme hatası:", e);
-                    });
-                }
-            };
-        }
-    } catch (err) {
-        console.error("Cihazlar listelenirken hata:", err);
+    } catch (e) {
+        console.error("Cihaz listeleme hatası:", e);
     }
 }
 
-
-// Seçili mikrofonun ID'sini döndürür
- 
-function getSelectedMicId() {
-    return dom.micSelect ? dom.micSelect.value : null;
-}
-
-
-// Seçili hoparlörün ID'sini döndürür
-
-function getSelectedSpeakerId() {
-    return dom.speakerSelect ? dom.speakerSelect.value : null;
-}
-
-module.exports = {
-    getDevices,
-    getSelectedMicId,
-    getSelectedSpeakerId
+// Cihaz Değişikliklerini Dinle (Tak-Çıkar)
+navigator.mediaDevices.ondevicechange = () => {
+    getDevices();
 };
+
+module.exports = { getDevices };

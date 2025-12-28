@@ -2,9 +2,7 @@
 const state = require('../state/appState');
 const dom = require('./dom');
 
-/**
- * Kullanıcı listesine yeni bir kart ekler veya mevcut olanı günceller
- */
+// Kullanıcı listesine yeni bir kart ekler veya mevcut olanı günceller
 function addUserUI(id, name, isConnected) {
     let el = document.getElementById(`user-${id}`);
     const statusText = isConnected ? 'Canlı' : 'Bağlanıyor...';
@@ -24,7 +22,14 @@ function addUserUI(id, name, isConnected) {
     el = document.createElement('div'); 
     el.id = `user-${id}`; 
     el.className = 'user-card'; 
-    dom.userListDiv.appendChild(el);
+    
+    // --- HATA DÜZELTME: dom.userListDiv -> dom.userList ---
+    if (dom.userList) {
+        dom.userList.appendChild(el);
+    } else {
+        console.error("HATA: dom.userList bulunamadı!");
+        return;
+    }
     
     // Diğer kullanıcılar için ses seviyesi ayarı ekle
     let volHTML = id !== 'me' ? `
@@ -54,6 +59,7 @@ function addUserUI(id, name, isConnected) {
     // Ses slider'ı için olay dinleyicisi ekle
     if (id !== 'me') {
         const slider = el.querySelector('.peer-volume-slider');
+        // updatePeerVolume hem sesi hem de yandaki % yazısını güncelleyecek
         slider.oninput = (e) => updatePeerVolume(id, e.target.value);
     }
 
@@ -63,9 +69,7 @@ function addUserUI(id, name, isConnected) {
     }
 }
 
-/**
- * Kullanıcı mikrofonunu kapattığında UI'daki ikonu günceller
- */
+// Kullanıcı mikrofonunu kapattığında UI'daki ikonu günceller
 function updateMicStatusUI(id, isMuted) {
     const el = document.getElementById(`user-${id}`); 
     if (!el) return;
@@ -83,27 +87,33 @@ function updateMicStatusUI(id, isMuted) {
     }
 }
 
-/**
- * Belirli bir kullanıcının ses seviyesini ayarlar
- */
+// Belirli bir kullanıcının ses seviyesini ayarlar
 function updatePeerVolume(id, value) {
-    const valSpan = document.getElementById(`vol-val-${id}`);
-    if (valSpan) valSpan.innerText = value + '%';
+    if (!state.peerVolumes) state.peerVolumes = {};
+    state.peerVolumes[id] = value;
 
-    const gainValue = (value / 100) * (dom.masterSlider.value / 100);
+    // 1. Slider yanındaki % yazısını güncelle
+    const textEl = document.getElementById(`vol-val-${id}`);
+    if (textEl) textEl.innerText = value + "%";
 
-    if (state.peerGainNodes[id]) {
-        state.peerGainNodes[id].gain.setTargetAtTime(
-            gainValue,
-            state.outputAudioContext.currentTime,
+    // 2. GainNode (Ses Yükseltme) Ayarı
+    const gainNode = state.peerGainNodes[id];
+    if (gainNode && state.outputAudioContext) {
+        const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1;
+        const peerVol = value / 100;
+        
+        gainNode.gain.setTargetAtTime(
+            peerVol * masterVol, 
+            state.outputAudioContext.currentTime, 
             0.01
         );
     }
 }
 
-/**
- * Kullanıcı kartına "İZLE" butonu ekler
- */
+// HTML'den erişilebilmesi için window'a bağla
+window.updatePeerVolume = updatePeerVolume;
+
+// Kullanıcı kartına "İZLE" butonu ekler
 function addVideoElement(id, stream) {
     state.activeRemoteStreams[id] = stream;
     const card = document.getElementById(`user-${id}`);
@@ -117,12 +127,12 @@ function addVideoElement(id, stream) {
     }
 
     // Yayın biterse butonu kaldır
-    stream.getVideoTracks()[0].onended = () => removeVideoElement(id);
+    if (stream.getVideoTracks().length > 0) {
+        stream.getVideoTracks()[0].onended = () => removeVideoElement(id);
+    }
 }
 
-/**
- * Yayın izleme butonunu ve modalı temizler
- */
+// Yayın izleme butonunu ve modalı temizler
 function removeVideoElement(id) {
     delete state.activeRemoteStreams[id];
     const card = document.getElementById(`user-${id}`); 
@@ -131,32 +141,41 @@ function removeVideoElement(id) {
         if (btn) btn.remove();
     }
     
+    // dom.streamerNameLabel dom.js'de olmayabilir, manuel seçiyoruz:
+    const streamerLabel = document.getElementById('streamerName');
+
     // Eğer modalda bu kişinin yayını açıksa kapat
-    if (dom.streamModal.style.display !== 'none' && dom.streamerNameLabel.getAttribute('data-id') === id) {
+    if (dom.streamModal && dom.streamModal.style.display !== 'none' && 
+        streamerLabel && streamerLabel.getAttribute('data-id') === id) {
+        
         dom.streamModal.style.display = 'none';
-        dom.largeVideoPlayer.srcObject = null;
+        if (dom.largeVideoPlayer) dom.largeVideoPlayer.srcObject = null;
     }
 }
 
-/**
- * Yayın izleme penceresini (Modal) açar
- */
+// Yayın izleme penceresini (Modal) açar
 function openStreamModal(id) {
     if (!state.activeRemoteStreams[id]) return alert("Yayın yok");
     
-    dom.largeVideoPlayer.srcObject = state.activeRemoteStreams[id];
-    dom.streamerNameLabel.innerText = `${state.userNames[id] || 'Biri'} Ekranı`;
-    dom.streamerNameLabel.setAttribute('data-id', id);
-    dom.streamModal.style.display = 'flex';
+    // Elementleri güvenli seç
+    const streamerLabel = document.getElementById('streamerName');
+
+    if (dom.largeVideoPlayer) dom.largeVideoPlayer.srcObject = state.activeRemoteStreams[id];
+    
+    if (streamerLabel) {
+        streamerLabel.innerText = `${state.userNames[id] || 'Biri'} Ekranı`;
+        streamerLabel.setAttribute('data-id', id);
+    }
+    
+    if (dom.streamModal) dom.streamModal.style.display = 'flex';
 }
 
-/**
- * Kullanıcı kartını listeden kaldırır
- */
+// Kullanıcı kartını listeden kaldırır
 function removeUserUI(id) {
     const el = document.getElementById(`user-${id}`);
     if (el) el.remove();
     
+    // Audio elementini de temizle
     const audio = document.getElementById(`audio-${id}`);
     if (audio) audio.remove();
 }
@@ -167,5 +186,6 @@ module.exports = {
     updateMicStatusUI,
     addVideoElement,
     removeVideoElement,
-    openStreamModal
+    openStreamModal,
+    updatePeerVolume
 };

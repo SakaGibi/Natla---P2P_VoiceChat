@@ -5,24 +5,21 @@ const dom = require('./dom');
  * Modallar için gerekli temel olay dinleyicilerini başlatır
  */
 function initModals() {
-    // Yayın İzleme (Stream) Modalı Kapatma
+    // Kapat butonu (Ekran İzleme)
     if (dom.btnCloseStream) {
-        dom.btnCloseStream.addEventListener('click', () => {
+        dom.btnCloseStream.onclick = () => {
             dom.streamModal.style.display = 'none';
             dom.largeVideoPlayer.srcObject = null;
-        });
+        };
     }
 
-    // Ayarlar Modalı Kapatma (X Butonu)
+    // Ayarlar kapat
     if (dom.btnCloseSettings) {
-        dom.btnCloseSettings.addEventListener('click', () => {
+        dom.btnCloseSettings.onclick = () => {
             dom.passwordModal.style.display = 'none';
-        });
+        };
     }
-
-    // Modal dışına tıklandığında kapatma gibi ekstra özellikler buraya eklenebilir
 }
-
 /**
  * Ayarlar penceresini açar ve mevcut değerleri doldurur
  * @param {Object} configData - Mevcut sunucu ve anahtar bilgileri
