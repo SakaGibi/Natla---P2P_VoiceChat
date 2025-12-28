@@ -7,6 +7,8 @@ const path = require('path');
 const fileInput = document.getElementById('fileInput');
 const btnAttach = document.getElementById('btnAttach');
 const fs = require('fs');
+const { initAutoUpdateUI } = require('./autoUpdateRenderer');
+
 
 // Uygulama Sesleri
 let joinPath = path.join(__dirname, 'assets', 'RIZZ_effect.mp3');
@@ -129,74 +131,15 @@ btnSaveKey.addEventListener('click', () => {
     }
 });
 
-// --- GÜNCELLEME MANTIĞI ---
-
-const btnDownloadUpdate = document.createElement('button');
-btnDownloadUpdate.id = "btnDownloadUpdate";
-btnDownloadUpdate.innerText = "Güncellemeyi İndir";
-btnDownloadUpdate.style.cssText = "display: none; background: #27ae60; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;";
-btnInstallUpdate.parentNode.insertBefore(btnDownloadUpdate, btnInstallUpdate);
-
-// Güncellemeleri Kontrol Et Butonu
-btnCheckUpdate.addEventListener('click', () => {
-    btnCheckUpdate.disabled = true;
-    updateStatus.innerText = "Güncellemeler kontrol ediliyor...";
-    ipcRenderer.send('check-for-update'); // main.js'e sor
+// Otomatik Güncelleme
+document.addEventListener('DOMContentLoaded', () => {
+    initAutoUpdateUI({
+        btnCheckUpdate,
+        btnInstallUpdate,
+        updateStatus,
+        btnConnect
+    });
 });
-
-// İndirmeyi Başlat Butonu (Yeni)
-btnDownloadUpdate.addEventListener('click', () => {
-    btnDownloadUpdate.disabled = true;
-    updateStatus.innerText = "İndirme başlatılıyor...";
-    ipcRenderer.send('start-download'); // main.js'e indir emri ver
-});
-
-// Güncelleme Kur Butonu
-btnInstallUpdate.addEventListener('click', () => {
-    btnInstallUpdate.disabled = true;
-    updateStatus.innerText = "Uygulama kapatılıyor ve güncelleniyor...";
-    ipcRenderer.send('install-update'); // main.js'e kur emri ver
-});
-
-// Ana süreçten (main.js) gelen yanıtlar
-// renderer.js içindeki ipcRenderer.on('update-available') kısmını güncelle:
-ipcRenderer.on('update-available', (event, version) => {
-    // Gelen 'version' bilgisini metne ekliyoruz
-    updateStatus.innerText = `Yeni sürüm bulundu! v:${version}, İndirmek istiyor musunuz?`;
-    updateStatus.style.color = "#3498db";
-    
-    btnCheckUpdate.style.display = 'none'; 
-    btnDownloadUpdate.style.display = 'block'; 
-});
-
-ipcRenderer.on('update-not-available', () => {
-    updateStatus.innerText = `Uygulama şu an güncel: v${currentAppVersion}`;
-    updateStatus.style.color = "#888";
-    btnCheckUpdate.disabled = false;
-});
-
-ipcRenderer.on('download-progress', (event, progressObj) => {
-    const percent = Math.round(progressObj.percent);
-    updateStatus.innerText = `İndiriliyor: %${percent}`;
-    btnDownloadUpdate.style.display = 'none'; // İndirme başlayınca butonu gizle
-});
-
-// main.js'ten 'update-ready' gelince (indirme bitince)
-ipcRenderer.on('update-ready', () => {
-    updateStatus.innerText = "İndirme tamamlandı! Yüklemeye hazır.";
-    updateStatus.style.color = "#2ecc71";
-    btnDownloadUpdate.style.display = 'none';
-    btnInstallUpdate.style.display = 'block'; // Kur butonunu göster
-});
-
-ipcRenderer.on('update-error', (event, error) => {
-    updateStatus.innerText = "Hata: " + error;
-    updateStatus.style.color = "#e74c3c";
-    btnCheckUpdate.disabled = false;
-});
-
-btnConnect.disabled = true;
-btnConnect.innerText = "Sunucuya bağlanılıyor...";
 
 if (isDev) {
     CONFIG_PATH = path.join(__dirname, 'config.json');
@@ -754,19 +697,42 @@ function attachVisualizer(stream, id) {
 function addAudioElement(id, stream) {
     if (document.getElementById(`audio-${id}`)) return;
 
-    const aud = document.createElement('audio'); 
-    aud.id = `audio-${id}`; 
-    aud.srcObject = stream; 
-    
-    aud.autoplay = true; 
-    aud.muted = false; 
-    aud.volume = 1.0;  
-    aud.style.display = "none"; 
-    aud.controls = false;      
+    const audioEl = document.createElement('audio');
+    audioEl.id = `audio-${id}`;
+    audioEl.srcObject = stream;
+    audioEl.autoplay = true;
+    audioEl.style.display = "none";
+    document.body.appendChild(audioEl);
 
-    document.getElementById('audioContainer').appendChild(aud);
-    aud.play().catch(e => { console.error("Oto oynatma hatası:", e); });
+    const ctx = outputAudioContext;
+
+    // 🔊 SOURCE
+    const source = ctx.createMediaStreamSource(stream);
+
+    // 🎚️ GAIN (0–300%)
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 1.0;
+
+    // 🧠 COMPRESSOR (BURAYA)
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -10;
+    compressor.knee.value = 20;
+    compressor.ratio.value = 6;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+
+    // 🔗 PIPELINE
+    source.connect(gainNode);
+    gainNode.connect(compressor);
+    compressor.connect(ctx.destination);
+
+    // referansları sakla
+    peerGainNodes[id] = gainNode;
+
+    audioEl.play().catch(() => {});
 }
+
+
 
 function addVideoElement(id, stream) {
     activeRemoteStreams[id] = stream;
@@ -825,13 +791,14 @@ if (btnAttach && fileInput) {
 function updatePeerVolume(id, value) {
     const valSpan = document.getElementById(`vol-val-${id}`);
     if (valSpan) valSpan.innerText = value + '%';
-    
+
     const gainValue = (value / 100) * (masterSlider.value / 100);
 
     if (peerGainNodes[id]) {
-        peerGainNodes[id].gain.setTargetAtTime(gainValue, outputAudioContext.currentTime, 0.01);
-    } else {
-        const aud = document.getElementById(`audio-${id}`);
-        if (aud) aud.volume = Math.min(1, gainValue);
+        peerGainNodes[id].gain.setTargetAtTime(
+            gainValue,
+            outputAudioContext.currentTime,
+            0.01
+        );
     }
 }

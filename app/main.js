@@ -86,8 +86,13 @@ autoUpdater.on('download-progress', (progressObj) => {
 });
 
 autoUpdater.on('update-available', (info) => {
-  log.info('Güncelleme bulundu!');
+  log.info('Güncelleme bulundu: ' + info.version);
   mainWindow.webContents.send('update-available', info.version); 
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  log.info('İndirme tamamlandı.');
+  mainWindow.webContents.send('update-ready'); 
 });
 
 app.whenReady().then(() => {
