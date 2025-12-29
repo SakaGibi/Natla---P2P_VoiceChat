@@ -77,6 +77,9 @@ function createPeer(targetId, name, initiator) {
                 else if (msg.type === 'mic-status') { 
                     userList.updateMicStatusUI(targetId, msg.isMuted); 
                 } 
+                else if (msg.type === 'deafen-status') {
+                    userList.updateDeafenStatusUI(targetId, msg.isDeafened);
+                }
                 else if (msg.type === 'sound-effect') { 
                     audioEngine.playLocalSound(msg.effectName); 
                 } 

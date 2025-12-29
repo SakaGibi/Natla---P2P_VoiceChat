@@ -91,7 +91,7 @@ function updateUserIcon(id) {
             mic.innerText = '🔇';
             mic.style.color = '#8b281d';
         } else if (isMuted) {
-            mic.innerText = 'X🎤';
+            mic.innerText = '❌';
             mic.style.color = '#8b281d';
         } else {
             mic.innerText = '🎤';

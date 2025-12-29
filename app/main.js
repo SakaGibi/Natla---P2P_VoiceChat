@@ -1,21 +1,22 @@
+// main.js - Electron Main Process
 const { app, BrowserWindow, session, desktopCapturer, ipcMain } = require('electron'); 
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 
-// Geliştirme modunda olup olmadığımızı kontrol et
+// Check if running in development mode
 const isDev = !app.isPackaged;
 
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
-autoUpdater.autoDownload = false; // Güncelleme bulununca otomatik indirsin ama kullanıcı "Yükle" deyince kurulsun
+autoUpdater.autoDownload = false;
 autoUpdater.forceDevUpdateConfig = true;
 autoUpdater.allowDowngrade = true;
 let mainWindow;
 
 function createWindow () {
   mainWindow = new BrowserWindow({
-    width: 650,
+    width: 660,
     height: 800,
     webPreferences: {
       nodeIntegration: true,
@@ -38,10 +39,10 @@ function createWindow () {
 
 }
 
-// --- IPC MANTIĞI: Renderer'dan Gelen İstekler ---
+// IPC Logic: Requests from Renderer
 ipcMain.on('check-for-update', () => {
   // if (isDev) {
-    // Geliştirme modunda butona basılırsa arayüzün asılı kalmaması için hemen cevap dönüyoruz
+    // Return immediately in dev mode to prevent UI hang
     //mainWindow.webContents.send('update-not-available');
   // } else {
     autoUpdater.checkForUpdates();
@@ -60,7 +61,7 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
-// --- AUTOUPDATER OLAYLARI: Renderer'a Bilgi Gönderme ---
+// AutoUpdater Events: Sending Info to Renderer
 
 autoUpdater.on('checking-for-update', () => {
   log.info('Güncelleme kontrol ediliyor...');

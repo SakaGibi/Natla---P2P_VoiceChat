@@ -250,6 +250,19 @@ body.light-theme #btnSettings {
 #btnToggleMic, #btnToggleSound { 
     background-color: #397251; 
 }
+#btnToggleMic:hover, #btnToggleSound:hover { 
+    background-color: #264b31; 
+    opacity: 1;
+}
+
+#btnToggleMic.btn-closed, #btnToggleSound.btn-closed {
+    background-color: #8b281d;
+}
+
+#btnToggleMic.btn-closed:hover, #btnToggleSound.btn-closed:hover {
+    background-color: #5b130d;
+    opacity: 1;
+}
 
 #btnDisconnect { 
     background-color: #8b281d;

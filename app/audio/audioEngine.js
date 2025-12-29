@@ -219,8 +219,8 @@ function setMicState(muted) {
 
     // Update UI
     if (dom.btnToggleMic) {
-        dom.btnToggleMic.innerText = muted ? '❌' : '🎤';
-        dom.btnToggleMic.style.backgroundColor = muted ? '#ff4757' : ''; 
+        dom.btnToggleMic.innerText = muted ? '🎤✖' : '🎤';
+        dom.btnToggleMic.classList.toggle('btn-closed', muted);
         dom.btnToggleMic.title = muted ? "Mikrofon Kapalı" : "Mikrofon Açık";
     }
 
@@ -246,7 +246,7 @@ function toggleDeafen() {
     // Update UI
     if (dom.btnToggleSound) {
         dom.btnToggleSound.innerText = isDeaf ? '🔇' : '🔊';
-        dom.btnToggleSound.style.backgroundColor = isDeaf ? '#ff4757' : ''; 
+        dom.btnToggleSound.classList.toggle('btn-closed', isDeaf);
         dom.btnToggleSound.title = isDeaf ? "Ses Kapalı" : "Ses Açık";
     }
 
@@ -260,6 +260,17 @@ function toggleDeafen() {
     if (isDeaf && !state.isMicMuted) {
         setMicState(true); 
     }
+
+    // Notify Peers
+    try {
+        const peerService = require('../webrtc/peerService');
+        if (state.isConnected) {
+            peerService.broadcast({
+                type: 'deafen-status',
+                isDeafened: isDeaf
+            });
+        }
+    } catch (e) { console.error(e); }
 }
 
 module.exports = {
