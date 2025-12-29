@@ -1,60 +1,29 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <!-- Meta & Config -->
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' ws: blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: data:;"> <title>Natla</title>
     <link rel="stylesheet" href="main.css">
-    <style>        
-        /* Yeni Üst Bar Düzeni (Bildirim + İsim) */
-        .status-name-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            padding: 5px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 5px;
-            border: 1px solid var(--border-color);
-        }
-
-        /* Sabit Boyutlu Kontroller */
-        .fixed-room-select {
-            width: 190px;
-            flex-shrink: 0;
-            cursor: pointer;
-            background: var(--input-bg);
-            color: var(--text-main);
-            border: 1px solid var(--input-border);
-        }
-
-        .fixed-join-btn {
-            width: 90px;
-            flex-shrink: 0;
-        }
-
-        /* Diğer Yardımcı Stiller */
-        .slider-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; width: 100%; }
-        .slider-group label { font-size: 14px; font-weight: bold; width: 100px; color: var(--text-main); }
-        .slider-group input { flex: 1; cursor: pointer; }
-        .slider-val { font-size: 12px; width: 35px; text-align: right; font-family: monospace; color: var(--text-muted); }
-        .device-select { flex: 1; padding: 5px; border-radius: 4px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); outline: none; max-width: 100%; font-size: 14px; }
-        #users::-webkit-scrollbar, #chatHistory::-webkit-scrollbar { width: 6px; }
-        #users::-webkit-scrollbar-thumb, #chatHistory::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
-    </style>
 </head>
 <body>
 
+<!-- Sidebar Section -->
 <div class="sidebar">
+    <!-- Header Row -->
     <div class="header-row">
         <h1>Natla</h1> 
         <button id="btnSettings" title="Sunucu Ayarları">⚙️</button>
     </div>
 
+    <!-- Settings Modal -->
     <div id="passwordModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
         <div style="background: #2b2b2b; padding: 30px; border-radius: 12px; border: 1px solid #444; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 400px; position: relative;">
+            <!-- Close Button -->
             <button id="btnCloseSettings" style="position: absolute; top: 10px; right: 10px; background: none; border: none; color: #888; cursor: pointer; font-size: 20px;">✖</button>
             <h3 style="color: #fff; margin-bottom: 20px; font-family: sans-serif; text-align: center;">⚙️ Sunucu Ayarları</h3>
         
+            <!-- Server Inputs -->
             <label style="color: #bbb; font-size: 12px; display:block; margin-bottom:5px;">Sunucu Adresi (ws://...)</label>
             <input type="text" id="serverInput" value="" placeholder="ws://ip_adresi:port" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #555; background: #1a1a1a; color: white; margin-bottom: 15px; outline: none;">
 
@@ -63,6 +32,7 @@
         
             <button id="btnSaveKey" style="background: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 20px;">AYARLARI KAYDET</button>
 
+            <!-- Update Section -->
             <div id="updateSection" style="border-top: 1px solid #444; padding-top: 15px;">
                 <label style="color: #bbb; font-size: 12px; display:block; margin-bottom:10px;">Uygulama Güncelleme</label>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -74,6 +44,7 @@
         </div>
     </div>
 
+    <!-- Status & Name Input -->
     <div class="status-name-row" style="position: relative;">
         <div id="roomPreview" style="font-size: 12px; color: #aaa;  flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 5px; pointer-events: none;">
             Sunucuya bağlanılıyor...
@@ -81,8 +52,10 @@
         <input type="text" id="username" placeholder="Adınız" class="compact-input">
     </div>
     
+    <!-- Connection Status -->
     <div id="status" style="display:none;"></div> 
     
+    <!-- Room Selection & Join Controls -->
     <div class="join-row" style="display: flex; gap: 5px;">
         <select id="roomSelect" class="compact-input fixed-room-select">
             <option value="genel">Genel</option>
@@ -93,6 +66,7 @@
         
         <button id="btnConnect" class="fixed-join-btn">Katıl</button>
 
+        <!-- Active Call Controls -->
         <div id="activeControls" style="display: none; flex: 1; gap: 5px; justify-content: flex-end;">
             <button id="btnToggleMic" title="Mikrofonu Aç/Kapat" style="flex:1;">🎤</button>
             <button id="btnToggleSound" title="Sesi Aç/Kapat" style="flex:1;">🔊</button>
@@ -100,7 +74,9 @@
         </div>
     </div>
 
+    <!-- Audio Settings Panel -->
     <div id="settingsPanel">
+        <!-- Input/Output Selection -->
         <div class="slider-group">
             <label>🎤 Giriş:</label>
             <select id="micSelect" class="device-select">
@@ -113,6 +89,7 @@
                 <option value="">Varsayılan Hoparlör</option>
             </select>
         </div>
+        <!-- Volume Controls -->
         <div class="slider-group">
             <label>🎙️ Mic Ses:</label>
             <input type="range" id="micVolume" min="0" max="200" value="100">
@@ -125,7 +102,9 @@
         </div>
     </div>
     
+    <!-- Users & Soundpad Section -->
     <div id="users">
+        <!-- Soundpad Grid -->
         <div id="soundpadArea">
             <button class="soundpad-btn" >1</button>
             <button class="soundpad-btn" >2</button>
@@ -145,6 +124,7 @@
             <button class="soundpad-btn" >16</button>
         </div>
 
+        <!-- User List -->
         <div class="user-list-header">
             <h3>Bağlı Kullanıcılar</h3>
             <button id="btnShareScreen" title="Ekran Paylaş" disabled>
@@ -155,13 +135,16 @@
     </div>
 </div>
 
+<!-- Chat Area -->
 <div class="chat-area">
+    <!-- Messages -->
     <div id="chatHistory">
         <div class="message received" style="align-self:center; background:var(--input-bg); border-bottom-left-radius: 12px; margin-top: auto;">
             Odaya hoş geldiniz!
         </div>
     </div>
     
+    <!-- Input Area -->
     <div class="chat-input-container">
         <input type="file" id="fileInput" style="display:none" />
         <input type="text" id="msgInput" placeholder="Bir mesaj yaz..." disabled>
@@ -170,8 +153,10 @@
     </div>
 </div>
 
+<!-- Audio Container -->
 <div id="audioContainer"></div>
 
+<!-- Stream Modal -->
 <div id="streamModal" class="stream-modal" style="display: none;">
     <div class="stream-header">
         <span id="streamerName">Yayın</span>
@@ -182,6 +167,7 @@
     </div>
 </div>
 
+<!-- Main Script -->
 <script src="renderer/index.js"></script>
 </body>
 </html>

@@ -1,34 +1,34 @@
-// app/ui/dom.js
+// dom.js - Centralized DOM Element References
 
 const dom = {
-    // Giriş Ekranı ve Bağlantı
+    // Login Screen & Connection
     inputUsername: document.getElementById('username'),
     roomSelect: document.getElementById('roomSelect'),
     btnConnect: document.getElementById('btnConnect'),
     activeControls: document.getElementById('activeControls'),
     
-    // Durum ve Bildirimler
+    // Status & Notifications
     updateStatus: document.getElementById('updateStatus'),
     roomPreviewDiv: document.getElementById('roomPreview'),
     
-    // Kontrol Butonları
+    // Control Buttons
     btnToggleMic: document.getElementById('btnToggleMic'),
     btnToggleSound: document.getElementById('btnToggleSound'),
     btnDisconnect: document.getElementById('btnDisconnect'),
     btnShareScreen: document.getElementById('btnShareScreen'),
     
-    // Sohbet Alanı
+    // Chat Area
     chatHistory: document.getElementById('chatHistory'),
     msgInput: document.getElementById('msgInput'),
     btnSend: document.getElementById('btnSend'),
     btnAttach: document.getElementById('btnAttach'),
     fileInput: document.getElementById('fileInput'),
     
-    // Kullanıcı Listesi
-    userList: document.getElementById('userList'), // userList.js burayı kullanıyor
+    // User List
+    userList: document.getElementById('userList'), // Used by userList.js
     audioContainer: document.getElementById('audioContainer'),
     
-    // Ayarlar Modalı
+    // Settings Modal
     btnSettings: document.getElementById('btnSettings'),
     passwordModal: document.getElementById('passwordModal'),
     btnCloseSettings: document.getElementById('btnCloseSettings'),
@@ -36,24 +36,23 @@ const dom = {
     keyInput: document.getElementById('keyInput'),
     btnSaveKey: document.getElementById('btnSaveKey'),
     
-    // --- HATA BURADAYDI: Bu ikisi eksikti ---
+    // Device Selection
     micSelect: document.getElementById('micSelect'),        
     speakerSelect: document.getElementById('speakerSelect'), 
-    // ----------------------------------------
 
-    // Sliderlar (HTML id'leri ile uyumlu)
+    // Volume Sliders
     micSlider: document.getElementById('micVolume'),      
     masterSlider: document.getElementById('masterVolume'), 
 
-    // Güncelleme Butonları
+    // Update Buttons
     btnCheckUpdate: document.getElementById('btnCheckUpdate'),
     btnInstallUpdate: document.getElementById('btnInstallUpdate'),
 
-    // Ekran Paylaşımı Modal
+    // Screen Share Modal
     streamModal: document.getElementById('streamModal'),
     btnCloseStream: document.getElementById('btnCloseStream'),
     largeVideoPlayer: document.getElementById('largeVideoPlayer'),
-    streamerNameLabel: document.getElementById('streamerName') // Bunu da ekledim garanti olsun
+    streamerNameLabel: document.getElementById('streamerName') // Added for safety
 };
 
 module.exports = dom;

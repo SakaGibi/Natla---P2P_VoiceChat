@@ -1,46 +1,43 @@
-// visualizer.js - Ses Görselleştirme (VU Meter)
+// visualizer.js - Audio Visualization (VU Meter)
 
 /**
- * Bir ses akışını analiz eder ve ilgili kullanıcının UI barını günceller
- * @param {MediaStream} stream - Analiz edilecek ses akışı
- * @param {string} id - Kullanıcının ID'si ("me" veya peerId)
+ * @param {MediaStream} stream - steam to be analyzed
+ * @param {string} id - user identifier (me or other user)
  */
+// Analyzes an audio stream and updates the UI bar for the user
 function attachVisualizer(stream, id) {
-    // Her kullanıcı için yeni bir analiz bağlamı oluşturulur
+    // Create new audio context
     const ac = new (window.AudioContext || window.webkitAudioContext)(); 
     const src = ac.createMediaStreamSource(stream); 
     const an = ac.createAnalyser(); 
     
-    // Orijinal ayarlara göre FFT boyutu 64 olarak belirlenir
+    // Set FFT size
     an.fftSize = 64; 
     src.connect(an);
     
     const data = new Uint8Array(an.frequencyBinCount); 
     const bar = document.getElementById(`meter-fill-${id}`);
     
-    /**
-     * Sürekli çalışan çizim döngüsü
-     */
+    // Continuous drawing loop
     function draw() { 
-        // Eğer kullanıcının kartı UI'dan silindiyse döngüyü durdur
+        // Stop if user card is removed
         if (!document.getElementById(`user-${id}`)) {
-            ac.close(); // Kaynakları serbest bırak
+            ac.close(); // Release resources
             return;
         }
 
         an.getByteFrequencyData(data); 
         
-        // Frekans verilerinin toplamını hesapla
+        // Calculate total frequency
         let sum = 0; 
         for (let i of data) sum += i; 
         
-        // Hesaplanan değeri bar genişliğine (%) dönüştür
-        // Formül: (Toplam / Uzunluk) * 2.5 katsayısı (Max 100)
+        // Convert to percentage width
         if (bar) {
             bar.style.width = Math.min(100, (sum / data.length) * 2.5) + "%"; 
         }
 
-        // Bir sonraki ekran yenilemesinde tekrar çalıştır
+        // Schedule next frame
         requestAnimationFrame(draw); 
     } 
 

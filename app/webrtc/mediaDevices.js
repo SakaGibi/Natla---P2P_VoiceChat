@@ -1,22 +1,21 @@
-// app/webrtc/mediaDevices.js
+// mediaDevices.js - Audio Device Management
 const dom = require('../ui/dom');
 const state = require('../state/appState');
-const audioEngine = require('../audio/audioEngine'); // AudioEngine'i ekledik
+const audioEngine = require('../audio/audioEngine'); // Import AudioEngine
 
 async function getDevices() {
     try {
-        // İzinleri tetiklemek için önce cihazları iste
-        // (Eğer etiketler boş gelirse initLocalStream zaten izin isteyecek)
+        // Request devices to trigger permissions
         const devices = await navigator.mediaDevices.enumerateDevices();
         
-        // Listeleri temizle
+        // Clear lists
         dom.micSelect.innerHTML = '';
         dom.speakerSelect.innerHTML = '';
 
         const audioInputs = devices.filter(d => d.kind === 'audioinput');
         const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
 
-        // Mikrofonları Listele
+        // List Microphones
         audioInputs.forEach(device => {
             const option = document.createElement('option');
             option.value = device.deviceId;
@@ -24,7 +23,7 @@ async function getDevices() {
             dom.micSelect.appendChild(option);
         });
 
-        // Hoparlörleri Listele
+        // List Speakers
         audioOutputs.forEach(device => {
             const option = document.createElement('option');
             option.value = device.deviceId;
@@ -32,7 +31,7 @@ async function getDevices() {
             dom.speakerSelect.appendChild(option);
         });
 
-        // Varsa kayıtlı seçimi geri yükle
+        // Restore saved selection if exists
         const savedMic = localStorage.getItem('selectedMic');
         const savedSpeaker = localStorage.getItem('selectedSpeaker');
 
@@ -44,11 +43,12 @@ async function getDevices() {
         }
 
     } catch (e) {
+        // Handle errors
         console.error("Cihaz listeleme hatası:", e);
     }
 }
 
-// Cihaz Değişikliklerini Dinle (Tak-Çıkar)
+// Listen for Device Changes (Plug-and-Play)
 navigator.mediaDevices.ondevicechange = () => {
     getDevices();
 };

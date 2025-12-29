@@ -1,14 +1,14 @@
-// peerService.js - WebRTC P2P Bağlantı Yönetimi
+// peerService.js - WebRTC P2P Connection Management
 const SimplePeer = require('simple-peer');
 const state = require('../state/appState');
 const dom = require('../ui/dom');
 
 /**
- * Yeni bir P2P bağlantısı oluşturur
- * @param {string} targetId - Bağlanılacak kullanıcının ID'si
- * @param {string} name - Kullanıcı adı
- * @param {boolean} initiator - Bağlantıyı başlatan taraf mı?
+ * @param {string} targetId - user to be connected
+ * @param {string} name - user name
+ * @param {boolean} initiator - is it the initiator of the connection
  */
+// Creates a new P2P connection
 function createPeer(targetId, name, initiator) {
     if (targetId === state.myPeerId || state.peers[targetId]) return;
 
@@ -26,7 +26,7 @@ function createPeer(targetId, name, initiator) {
             config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } 
         });
 
-        // --- SİNYALLEŞME ---
+        // Signaling
         peer.on('signal', signal => { 
             socketService.send({ 
                 type: 'signal', 
@@ -35,38 +35,38 @@ function createPeer(targetId, name, initiator) {
             }); 
         });
 
-        // --- MEDYA AKIŞI ---
+        // Media Stream
         peer.on('stream', stream => {
             console.log(`📡 ${targetId} kullanıcısından akış alındı.`);
                 
             if (stream.getVideoTracks().length > 0) {
-                // Bu bir ekran paylaşımı akışıdır
+                // screen share stream
                 const userList = require('../ui/userList');
                 userList.addVideoElement(targetId, stream);
             } else {
-                // Bu bir mikrofon ses akışıdır
+                // microphone audio stream
                 const visualizer = require('../audio/visualizer');
                 const userList = require('../ui/userList');
                 const audioEngine = require('../audio/audioEngine');
                 
-                // 1. Sesi hoparlöre ver
+                // 1. Output audio to speaker
                 audioEngine.addAudioElement(targetId, stream); 
                 
-                // 2. UI kartını oluştur veya güncelle
+                // 2. Create or update UI card
                 userList.addUserUI(targetId, state.userNames[targetId] || "Biri", true);
                 
-                // 3. Ses barını akışa bağla
+                // 3. Attach visualizer to stream
                 visualizer.attachVisualizer(stream, targetId); 
             }
         });
 
-        // --- VERİ KANALI (Chat, Dosya, Durum) ---
+        // Data Channel (Chat, File, Status)
         peer.on('data', data => { 
             try {
                 const strData = new TextDecoder("utf-8").decode(data);
                 const msg = JSON.parse(strData);
                 
-                // Gelen verinin tipine göre ilgili servise yönlendir
+                // Route to service based on message type
                 if (msg.type === 'file-metadata' || msg.type === 'file-end' || msg.type === 'file-cancel') {
                     fileTransfer.handleIncomingFileData(targetId, data);
                 } 
@@ -84,7 +84,7 @@ function createPeer(targetId, name, initiator) {
                     userList.removeVideoElement(targetId); 
                 }
             } catch (e) { 
-                // JSON değilse ham dosyadır
+                // If not JSON, it is raw file data
                 fileTransfer.handleIncomingFileData(targetId, data); 
             }
         });
@@ -98,9 +98,7 @@ function createPeer(targetId, name, initiator) {
     }
 }
 
-/**
- * Gelen sinyal verisini mevcut peer'a iletir
- */
+// Forwards incoming signal data to existing peer
 function handleSignal(senderId, signal) {
     if (!state.peers[senderId]) {
         const userName = state.userNames[senderId] || "Bilinmeyen";
@@ -111,9 +109,7 @@ function handleSignal(senderId, signal) {
     }
 }
 
-/**
- * Peer bağlantısını ve ilgili UI öğelerini temizler
- */
+// Clears peer connection and related UI elements
 function removePeer(id) {
     if (state.peers[id]) { 
         state.peers[id].destroy(); 
@@ -127,9 +123,7 @@ function removePeer(id) {
     userList.removeUserUI(id);
 }
 
-/**
- * Tüm bağlı peer'lara veri gönderir
- */
+// Sends data to all connected peers
 function broadcast(payload) {
     const jsonPayload = JSON.stringify(payload);
     for (let id in state.peers) { 

@@ -1,15 +1,13 @@
-// screenShare.js - Ekran Paylaşımı Yönetimi
+// screenShare.js - Screen Share Management
 const state = require('../state/appState');
 const dom = require('../ui/dom');
 
-/**
- * Ekran paylaşımını başlatır
- */
+// Starts screen sharing
 async function start() {
     if (state.isSharingScreen) return;
 
     try {
-        // Ekran yakalama isteği
+        // Request screen capture
         const stream = await navigator.mediaDevices.getDisplayMedia({ 
             video: true, 
             audio: false 
@@ -18,16 +16,16 @@ async function start() {
         state.screenStream = stream;
         state.isSharingScreen = true;
 
-        // UI Güncelleme
+        // Update UI
         dom.btnShareScreen.innerText = "🛑 Durdur";
         dom.btnShareScreen.style.backgroundColor = "#e74c3c";
 
-        // Paylaşım manuel olarak (browser üzerinden) durdurulursa
+        // Handle manual stop via browser UI
         state.screenStream.getVideoTracks()[0].onended = () => { 
             stop(); 
         };
 
-        // Mevcut tüm bağlantılara ekran akışını ekle
+        // Add screen stream to all existing connections
         for (let id in state.peers) { 
             try { 
                 state.peers[id].addStream(state.screenStream); 
@@ -40,16 +38,14 @@ async function start() {
     }
 }
 
-/**
- * Ekran paylaşımını durdurur ve diğer kullanıcıları bilgilendirir
- */
+// Stops screen sharing and notifies peers
 function stop() {
     if (!state.screenStream) return;
 
-    // Akış kanallarını kapat
+    // Stop stream tracks
     state.screenStream.getTracks().forEach(track => track.stop());
 
-    // Tüm bağlantılardan akışı çıkar ve bilgilendirme mesajı gönder
+    // Remove stream from peers and send notification
     for (let id in state.peers) {
         try {
             state.peers[id].removeStream(state.screenStream);
@@ -62,7 +58,7 @@ function stop() {
         }
     }
 
-    // State ve UI temizliği
+    // Clean up state and UI
     state.screenStream = null;
     state.isSharingScreen = false;
     

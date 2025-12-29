@@ -1,36 +1,34 @@
-// roomPreview.js - Oda Önizleme ve Durum Bildirimleri
+// roomPreview.js - Room Preview & Status Notifications
 const state = require('../state/appState');
 const dom = require('./dom');
 
 /**
- * Belirli bir süre sonra kaybolan durum mesajları gösterir (Örn: "X katıldı 👋")
- * @param {string} message - Gösterilecek mesaj
- * @param {string} color - Mesajın rengi (Hex veya Renk Adı)
+ * @param {string} message - message to display
+ * @param {string} color - text color (default: green)
  */
+// Shows temporary status messages that disappear after a delay
 function showTemporaryStatus(message, color = "#4cd137") {
     if (!dom.roomPreviewDiv) return;
     
-    // Eğer halihazırda bir zamanlayıcı varsa temizle
+    // Clear existing timer if present
     if (state.statusTimeout) clearTimeout(state.statusTimeout);
 
     dom.roomPreviewDiv.innerText = message;
     dom.roomPreviewDiv.style.color = color;
     dom.roomPreviewDiv.style.fontWeight = "bold";
 
-    // 3 saniye sonra orijinal oda görünümüne geri dön
+    // Revert to original room view after 3 seconds
     state.statusTimeout = setTimeout(() => {
         state.statusTimeout = null; 
         updateRoomPreview();
     }, 3000);
 }
 
-/**
- * Seçili odadaki kullanıcı sayısını ve isimlerini UI'da günceller
- */
+// Updates the UI with user count and names in the selected room
 function updateRoomPreview() {
     if (!dom.roomSelect) return;
     
-    // Eğer ekranda geçici bir durum mesajı (status) varsa güncelleme yapma
+    // Skip update if a temporary status message is active
     if (state.statusTimeout) return;
 
     const selectedRoom = dom.roomSelect.value;
@@ -40,11 +38,11 @@ function updateRoomPreview() {
         dom.roomPreviewDiv.style.fontWeight = "normal";
         
         if (state.isConnected) {
-            // Bağlıyken: "📢 Genel (3 Kişi)"
+            // Connected: "📢 General (3 People)"
             dom.roomPreviewDiv.innerText = `${getRoomName(state.currentRoom)} (${usersInRoom.length} Kişi)`;
             dom.roomPreviewDiv.style.color = "var(--text-main)";
         } else {
-            // Bağlı değilken: Seçili odadaki kullanıcı isimlerini göster
+            // Not connected: Show user names in selected room
             if (usersInRoom.length === 0) {
                 dom.roomPreviewDiv.innerText = `${getRoomName(selectedRoom)}: Boş`;
             } else {
@@ -57,9 +55,9 @@ function updateRoomPreview() {
 }
 
 /**
- * Oda ID'lerini kullanıcı dostu isimlere ve ikonlara dönüştürür
  * @param {string} val - Oda anahtarı (genel, oyun vb.)
  */
+// Converts room IDs to user-friendly names and icons
 function getRoomName(val) {
     if (val === 'genel') return "📢 Genel";
     if (val === 'oyun') return "🎮 Oyun";
@@ -68,9 +66,7 @@ function getRoomName(val) {
     return val;
 }
 
-/**
- * Oda seçim kutusu değiştiğinde önizlemeyi anında güncellemek için dinleyici ekle
- */
+// Add listener to update preview instantly when room selection changes
 if (dom.roomSelect) {
     dom.roomSelect.addEventListener('change', () => {
         if (state.statusTimeout) { 

@@ -1,9 +1,9 @@
-// helpers.js - Yardımcı Fonksiyonlar ve Biçimlendiriciler
+// helpers.js - Helper Functions & Formatters
 
 /**
- * Mevcut saati "SS:DD" formatında döndürür
- * @returns {string} Örn: "14:25"
+ * @returns {string} Example: "14:30"
  */
+// Returns current time in "HH:MM" format
 function getCurrentTime() {
     return new Date().toLocaleTimeString([], { 
         hour: '2-digit', 
@@ -12,24 +12,24 @@ function getCurrentTime() {
 }
 
 /**
- * Bayt cinsinden dosya boyutunu okunabilir formata çevirir (MB)
- * @param {number} bytes - Dosya boyutu (byte)
- * @param {number} decimals - Ondalık basamak sayısı
- * @returns {string} Örn: "15.50 MB"
+ * @param {number} bytes - File size in bytes
+ * @param {number} decimals - Decimal places
+ * @returns {string} Example: "15.50 MB"
  */
+// Converts file size in bytes to readable format (MB)
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0) return '0 MB';
     
-    // Uygulama geneli MB üzerinden hesaplama yaptığı için doğrudan dönüşüm yapıyoruz
+    // Calculate MB directly as app uses MB globally
     const mb = bytes / (1024 * 1024);
     return mb.toFixed(decimals) + ' MB';
 }
 
 /**
- * Belirli bir metni HTML içinde güvenle göstermek için temizler (XSS koruması)
- * @param {string} str - Ham metin
- * @returns {string} Temizlenmiş metin
+ * @param {string} str - text to sanitize
+ * @returns {string} sanitized text
  */
+// Sanitizes text for safe display in HTML (XSS protection)
 function escapeHTML(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -37,9 +37,9 @@ function escapeHTML(str) {
 }
 
 /**
- * Benzersiz bir Transfer ID oluşturur
- * @returns {string} Örn: "transfer-1703765432100"
+ * @returns {string} returns a unique transfer ID
  */
+// Generates a unique Transfer ID
 function generateTransferId() {
     return "transfer-" + Date.now();
 }

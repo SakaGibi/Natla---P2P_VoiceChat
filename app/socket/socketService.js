@@ -1,19 +1,20 @@
-// socketService.js - WebSocket Yönetimi ve Mesaj Yönlendirici
+// socketService.js - WebSocket Management & Message Router
 const state = require('../state/appState');
 const dom = require('../ui/dom');
 
 let socket = null;
 let messageQueue = []; 
 
-/**
- * Sunucuya bağlantı başlatır
- */
+// --- CONNECTION LOGIC ---
+
+// Connect to Server
 function connect(url) {
     if (!url) {
         if (dom.roomPreviewDiv) dom.roomPreviewDiv.innerText = "Config hatası!";
         return;
     }
 
+    // Check existing connection
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
         return;
     }
@@ -26,12 +27,13 @@ function connect(url) {
     }
 
     socket.onopen = () => {
+        // Update UI
         if (dom.btnConnect) {
             dom.btnConnect.disabled = false;
             dom.btnConnect.innerText = "Katıl";
         }
         
-        // Kuyruktaki mesajları gönder
+        // Send queued messages
         if (messageQueue.length > 0) {
             while (messageQueue.length > 0) {
                 const msg = messageQueue.shift();
@@ -39,6 +41,7 @@ function connect(url) {
             }
         }
 
+        // Update Preview
         try {
             const roomPreview = require('../ui/roomPreview');
             roomPreview.showTemporaryStatus("Sunucu bağlantısı aktif", "#2ecc71");
@@ -68,9 +71,9 @@ function connect(url) {
     };
 }
 
-/**
- * Gelen mesaj tipine göre ilgili servisi tetikler
- */
+// --- MESSAGE HANDLING ---
+
+// Handle Incoming Messages
 function handleMessage(data) {
     const peerService = require('../webrtc/peerService');
     const chatService = require('../chat/chatService');
@@ -80,6 +83,7 @@ function handleMessage(data) {
     let roomPreview = null;
     try { roomPreview = require('../ui/roomPreview'); } catch(e){}
 
+    // Handle Message Types
     switch (data.type) {
         case 'error':
             alert("Sunucu Hatası: " + data.message);
@@ -101,7 +105,7 @@ function handleMessage(data) {
                         state.userNames[u.id] = u.name;
                         userList.addUserUI(u.id, u.name, true);
                         
-                        // [ÇÖZÜM]: ID Karşılaştırmalı başlatma
+                        // [FIX]: ID Comparison Initiation
                         if (shouldIInitiate(state.myPeerId, u.id)) {
                             peerService.createPeer(u.id, u.name, true);
                         }
@@ -117,7 +121,7 @@ function handleMessage(data) {
             userList.addUserUI(data.id, data.name, true);
             audioEngine.playSystemSound('join');
             
-            // [ÇÖZÜM]: ID Karşılaştırmalı başlatma
+            // [FIX]: ID Comparison Initiation
             if (shouldIInitiate(state.myPeerId, data.id)) {
                 peerService.createPeer(data.id, data.name, true);
             }
@@ -157,17 +161,15 @@ function handleMessage(data) {
     }
 }
 
-/**
- * [ÇÖZÜM] Çarpışma Önleyici Mantık
- */
+// --- HELPER FUNCTIONS ---
+
+// [FIX]: Collision Avoidance Logic
 function shouldIInitiate(myId, targetId) {
     if (!myId || !targetId) return false;
     return myId > targetId;
 }
 
-/**
- * Odaya katılma isteği gönderir
- */
+// Join Room Request
 function joinRoom(name, room) {
     const accessKey = state.configData && state.configData.ACCESS_KEY 
                       ? state.configData.ACCESS_KEY.trim() 
@@ -183,9 +185,7 @@ function joinRoom(name, room) {
     send(payload);
 }
 
-/**
- * Güvenli veri gönderme fonksiyonu
- */
+// Safe Send Function
 function send(payload) {
     if (!socket) {
         messageQueue.push(payload);

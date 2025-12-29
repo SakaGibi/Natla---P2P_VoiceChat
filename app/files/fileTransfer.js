@@ -1,11 +1,11 @@
-// fileTransfer.js - Dosya Transfer Yönetimi (P2P)
+// fileTransfer.js - File Transfer Management (P2P)
 const state = require('../state/appState');
 const dom = require('../ui/dom');
 
 /**
- * Dosya transferini durdurur ve karşı tarafı bilgilendirir
+ * Stops file transfer and notifies the peer
  * @param {string} tId - Transfer ID
- * @param {boolean} isSender - İptal eden gönderen mi?
+ * @param {boolean} isSender - Is the canceller the sender?
  */
 function cancelTransfer(tId, isSender = true) {
     if (state.activeTransfers[tId]) {
@@ -29,15 +29,13 @@ function cancelTransfer(tId, isSender = true) {
     }
 }
 
-/**
- * Gönderilen dosya için UI kartı oluşturur ve önizleme ekler
- */
+// Creates UI card for sent file and adds preview
 function addFileSentUI(file, tId) {
     const div = document.createElement('div');
     div.id = `card-${tId}`;
     div.className = 'message sent file-message';
     
-    // HTML yapısını oluştur (İptal butonu ve Progress Bar dahil)
+    // Create HTML structure (Includes Cancel button and Progress Bar)
     div.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span class="transfer-status" style="font-size:11px; font-weight:bold; opacity:0.8;">GÖNDERİLİYOR</span>
@@ -55,10 +53,10 @@ function addFileSentUI(file, tId) {
 
     dom.chatHistory.appendChild(div);
     
-    // İptal butonuna olay ekle
+    // Add event to cancel button
     div.querySelector('.cancel-file-btn').onclick = () => cancelTransfer(tId, true);
 
-    // Resim dosyasıysa önizleme oluştur
+    // Create preview if image file
     if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -74,17 +72,16 @@ function addFileSentUI(file, tId) {
     dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
 }
 
-/**
- * Dosyayı parçalara ayırarak P2P kanalından gönderir
- */
+
+// Sends file via P2P channel by splitting into chunks
 function sendFile(peer, file, tId) {
     if (!peer || !peer.connected) return;
     if (!state.activeTransfers[tId]) state.activeTransfers[tId] = { cancelled: false };
 
-    const chunkSize = 16 * 1024; // 16KB dilimler
+    const chunkSize = 16 * 1024; // 16KB chunks
     let offset = 0;
 
-    // Önce metadata gönder
+    // Send metadata first
     peer.send(JSON.stringify({ 
         type: 'file-metadata', 
         payload: { name: file.name, size: file.size, type: file.type, tId: tId } 
@@ -93,7 +90,7 @@ function sendFile(peer, file, tId) {
     const readAndSend = () => {
         if (state.activeTransfers[tId]?.cancelled) return;
         
-        // Kanal yoğunsa bekle
+        // Wait if channel is busy
         if (peer._channel && peer._channel.bufferedAmount > 64 * 1024) {
             setTimeout(readAndSend, 50);
             return;
@@ -113,7 +110,7 @@ function sendFile(peer, file, tId) {
             if (offset < file.size) {
                 readAndSend();
             } else {
-                // Gönderim tamamlandı
+                // Transfer completed
                 peer.send(JSON.stringify({ type: 'file-end', payload: { tId: tId } }));
                 
                 const audioEngine = require('../audio/audioEngine');
@@ -133,14 +130,13 @@ function sendFile(peer, file, tId) {
     readAndSend();
 }
 
-/**
- * Gelen ham veriyi veya transfer kontrol mesajlarını işler
- */
+
+// Handles incoming raw data or transfer control messages
 function handleIncomingFileData(senderId, data) {
     let message = null;
     let isJson = false;
 
-    // Verinin JSON olup olmadığını kontrol et
+    // Check if data is JSON
     try {
         if (typeof data === 'string') {
             message = JSON.parse(data);
@@ -152,7 +148,7 @@ function handleIncomingFileData(senderId, data) {
     } catch (e) { isJson = false; }
 
     if (isJson && message?.type) {
-        // Kontrol mesajlarını işle
+        // Handle control messages
         const tId = message.payload?.tId;
 
         if (message.type === 'file-metadata') {
@@ -166,7 +162,7 @@ function handleIncomingFileData(senderId, data) {
                 const blob = new Blob(fData.receivedChunks, { type: fData.metadata.type });
                 const url = URL.createObjectURL(blob);
                 
-                // Resim önizlemesi güncelle
+                // Update image preview
                 if (fData.metadata.type?.startsWith('image/')) {
                     const imgEl = document.getElementById(`preview-img-rec-${tId}`);
                     const contEl = document.getElementById(`preview-cont-rec-${tId}`);
@@ -176,7 +172,7 @@ function handleIncomingFileData(senderId, data) {
                     }
                 }
 
-                // İndirme linkini aktif et
+                // Activate download link
                 const link = document.getElementById(`link-${tId}`);
                 if (link) { link.href = url; link.download = fData.metadata.name; link.style.display = 'block'; }
                 
@@ -208,7 +204,7 @@ function handleIncomingFileData(senderId, data) {
             delete state.activeIncomingTransferIds[senderId];
         }
     } else {
-        // Ham veri parçası (Chunk)
+        // Raw data chunk
         const tId = state.activeIncomingTransferIds[senderId];
         const fData = state.receivingFiles[tId];
         if (fData) {
@@ -220,9 +216,8 @@ function handleIncomingFileData(senderId, data) {
     }
 }
 
-/**
- * Gelen dosya için alıcı tarafında UI kartı oluşturur
- */
+
+// Creates UI card for incoming file on receiver side
 function displayIncomingFile(senderId, fileName, fileSize, tId, fileType) {
     const div = document.createElement('div');
     div.id = `card-rec-${tId}`;

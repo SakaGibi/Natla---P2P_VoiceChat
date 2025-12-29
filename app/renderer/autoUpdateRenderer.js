@@ -1,4 +1,3 @@
-// autoUpdateRenderer.js
 const { ipcRenderer } = require('electron');
 
 function initAutoUpdateUI({
@@ -9,13 +8,13 @@ function initAutoUpdateUI({
 }) {
     let currentVersion = "Sürüm yükleniyor...";
 
-    // Başlangıçta sürümü alalım
+    // Get Initial Version
     ipcRenderer.invoke('get-app-version').then(v => {
         currentVersion = v;
         updateStatus.innerText = "Sürüm: " + v;
     });
 
-    // --- DİNAMİK BUTON OLUŞTURMA ---
+    // --- CREATE DYNAMIC DOWNLOAD BUTTON ---
     const btnDownloadUpdate = document.createElement('button');
     btnDownloadUpdate.id = "btnDownloadUpdate";
     btnDownloadUpdate.innerText = "Güncellemeyi İndir";
@@ -35,26 +34,30 @@ function initAutoUpdateUI({
 
     // --- EVENT LISTENERS ---
 
+    // Check for Update
     btnCheckUpdate.addEventListener('click', () => {
         btnCheckUpdate.disabled = true;
         updateStatus.innerText = "Güncellemeler kontrol ediliyor...";
         ipcRenderer.send('check-for-update');
     });
 
+    // Start Download
     btnDownloadUpdate.addEventListener('click', () => {
         btnDownloadUpdate.disabled = true;
         updateStatus.innerText = "İndirme başlatılıyor...";
         ipcRenderer.send('start-download');
     });
 
+    // Install Update
     btnInstallUpdate.addEventListener('click', () => {
         btnInstallUpdate.disabled = true;
         updateStatus.innerText = "Uygulama kapatılıyor ve güncelleniyor...";
         ipcRenderer.send('install-update');
     });
 
-    // --- IPC DINLEYICILERI (Renderer.js'den buraya taşındı) ---
+    // --- IPC LISTENERS ---
 
+    // Update Available
     ipcRenderer.on('update-available', (event, version) => {
         updateStatus.innerText = `Yeni sürüm bulundu! v${version}, İndirmek istiyor musunuz?`;
         updateStatus.style.color = "#3498db";
@@ -62,18 +65,21 @@ function initAutoUpdateUI({
         btnDownloadUpdate.style.display = 'block';
     });
 
+    // Update Not Available
     ipcRenderer.on('update-not-available', () => {
         updateStatus.innerText = `Uygulama güncel: v${currentVersion}`;
         updateStatus.style.color = "#888";
         btnCheckUpdate.disabled = false;
     });
 
+    // Download Progress
     ipcRenderer.on('download-progress', (event, progressObj) => {
         const percent = Math.round(progressObj.percent);
         updateStatus.innerText = `İndiriliyor: %${percent}`;
         btnDownloadUpdate.style.display = 'none';
     });
 
+    // Update Ready to Install
     ipcRenderer.on('update-ready', () => {
         updateStatus.innerText = "İndirme tamamlandı! Yüklemeye hazır.";
         updateStatus.style.color = "#2ecc71";
@@ -81,6 +87,7 @@ function initAutoUpdateUI({
         btnInstallUpdate.style.display = 'block';
     });
 
+    // Update Error
     ipcRenderer.on('update-error', (event, error) => {
         updateStatus.innerText = "Hata: " + error;
         updateStatus.style.color = "#e74c3c";

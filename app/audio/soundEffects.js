@@ -1,7 +1,7 @@
-// app/audio/soundEffects.js
+// soundEffects.js - Soundpad & Effect Management
 const state = require('../state/appState');
 const socketService = require('../socket/socketService');
-const audioEngine = require('./audioEngine'); // AudioEngine'i dahil ediyoruz
+const audioEngine = require('./audioEngine'); // Import AudioEngine
 const dom = require('../ui/dom');
 
 const soundList = [
@@ -34,17 +34,17 @@ function initSoundpad() {
             btn.title = soundData.title;
 
             btn.onclick = () => {
-                // 1. Durum Kontrolleri: Bağlı mıyız? Sesler kapalı mı?
+                // 1. Status Checks
                 if (!state.isConnected) return;
-                if (state.isDeafened) return; // KRİTİK: Eğer sağırlaştırılmışsa çalma
+                if (state.isDeafened) return;
 
                 const fileName = soundData.file + ".mp3";
 
-                // 2. Kendi hoparlöründe çal (Artık audioEngine üzerinden yapıyoruz)
-                // audioEngine.playLocalSound zaten isDeafened kontrolü ve doğru yol mantığına sahip
+                // 2. Play locally
+                // Logic handled in audioEngine
                 audioEngine.playLocalSound(fileName); 
 
-                // 3. Sunucuya (Diğerlerine) gönder
+                // 3. Send to server
                 socketService.send({
                     type: 'sound-effect',
                     effectName: fileName

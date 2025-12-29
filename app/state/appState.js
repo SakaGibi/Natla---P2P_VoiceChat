@@ -1,47 +1,47 @@
-// appState.js - Uygulamanın Global Durum Yönetimi
+// appState.js - Global State Management
 
 module.exports = {
-    // --- Uygulama Genel Bilgileri ---
+    // General App Info
     currentAppVersion: "Sürüm yükleniyor...",
     configData: null,
     
-    // --- Bağlantı ve Oda Bilgileri ---
+    // Connection & Room Info
     isConnected: false,
     myPeerId: null,
     currentRoom: 'genel',
-    allUsers: [], // Sunucudan gelen tüm kullanıcıların listesi
-    userNames: {}, // ID -> Name eşleşmesi
+    allUsers: [], // List of all users from server
+    userNames: {}, // ID -> Name mapping
     
-    // --- WebRTC ve Peer Yönetimi ---
-    peers: {}, // Aktif P2P bağlantıları
-    activeRemoteStreams: {}, // Diğer kullanıcılardan gelen ekran paylaşımları
+    // WebRTC & Peer Management
+    peers: {}, // Active P2P connections
+    activeRemoteStreams: {}, // Remote screen shares
     
-    // --- Medya Durumları ---
+    // Media States
     isMicMuted: false,
     isDeafened: false,
     isSharingScreen: false,
     
-    // --- Ses Akışları ve Web Audio API Nesneleri ---
-    localStream: null, // Mikrofon ham sesi
-    screenStream: null, // Ekran paylaşım akışı
-    processedStream: null, // İşlenmiş (gain uygulanmış) ses
+    // Audio Streams & Web Audio API Objects
+    localStream: null, // Raw microphone audio
+    screenStream: null, // Screen share stream
+    processedStream: null, // Processed audio (gain applied)
     
-    audioContext: null, // Giriş ses işleme bağlamı (Web Audio API)
-    outputAudioContext: null, // Çıkış ses işleme bağlamı
+    audioContext: null, // Input audio processing context
+    outputAudioContext: null, // Output audio processing context
     
-    micGainNode: null, // Kendi mikrofon ses seviyesi (Gain) düğümü
-    peerGainNodes: {}, // Diğer kullanıcıların ses seviyesi düğümleri
+    micGainNode: null, // Own mic volume (Gain) node
+    peerGainNodes: {}, // Peer volume nodes
     
-    // --- Kritik Veri Nesneleri (Hata Çözümü) ---
-    // Bu nesneler boş başlatılmazsa "Cannot set properties of undefined" hatası alınır.
-    peerVolumes: {}, // Kullanıcı ID -> Ses Yüzdesi (%0-200) eşleşmesi
-    micSensitivity: 100, // Mikrofon kazanç seviyesi (% olarak başlar)
+    // Critical Data Objects (Error Fix)
+    // Prevents "Cannot set properties of undefined" errors if not initialized.
+    peerVolumes: {}, // User ID -> Volume Percentage (0-200%)
+    micSensitivity: 100, // Mic gain level (starts as %)
     
-    // --- Dosya Transferi Takibi ---
-    receivingFiles: {}, // Alınmakta olan dosyaların parçaları
-    activeTransfers: {}, // Gönderilen dosyaların iptal takibi
-    activeIncomingTransferIds: {}, // SenderId -> TransferId eşleşmesi
+    // File Transfer Tracking
+    receivingFiles: {}, // Parts of files being received
+    activeTransfers: {}, // Cancellation tracking for sent files
+    activeIncomingTransferIds: {}, // SenderId -> TransferId mapping
     
-    // --- UI Yardımcıları ---
-    statusTimeout: null // Durum mesajlarını temizlemek için kullanılan zamanlayıcı
+    // UI Helpers
+    statusTimeout: null // Timer to clear status messages
 };

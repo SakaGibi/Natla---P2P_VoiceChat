@@ -1,8 +1,8 @@
-// index.js - Giriş Noktası
+// index.js - Entry Point
 const { ipcRenderer } = require('electron');
 const path = require('path');
 
-// --- YOLLARIN DÜZELTİLMESİ ---
+// --- IMPORTS ---
 const dom = require(path.join(__dirname, 'ui/dom'));
 const state = require(path.join(__dirname, 'state/appState'));
 const configService = require(path.join(__dirname, 'config/configService'));
@@ -15,9 +15,9 @@ const userList = require(path.join(__dirname, 'ui/userList'));
 const visualizer = require(path.join(__dirname, 'audio/visualizer'));
 const { initAutoUpdateUI } = require(path.join(__dirname, 'renderer/autoUpdateRenderer'));
 
-// --- BAŞLANGIÇ AYARLARI ---
+// --- INITIAL SETUP ---
 window.onload = async () => {
-    // 1. Modalları ve Soundpad'i Başlat
+    // 1. Initialize Modals & Soundpad
     try {
         const modals = require(path.join(__dirname, 'ui/modals'));
         modals.initModals();
@@ -28,7 +28,7 @@ window.onload = async () => {
         console.error("❌ Başlatma hatası (Modals/Soundpad):", err);
     }
 
-    // 2. Sürüm Bilgisini Al
+    // 2. Get Version Info
     try {
         const version = await ipcRenderer.invoke('get-app-version');
         state.currentAppVersion = version;
@@ -37,16 +37,16 @@ window.onload = async () => {
         dom.updateStatus.innerText = "Sürüm bilgisi alınamadı";
     }
 
-    // 3. İsim Hatırlama
+    // 3. Remember Name
     const savedName = localStorage.getItem('username');
     if (savedName && dom.inputUsername) {
         dom.inputUsername.value = savedName; 
     }
 
-    // 4. Cihazları Listele
+    // 4. List Devices
     await mediaDevices.getDevices();
 
-    // 5. Config Yükle ve Bağlan
+    // 5. Load Config & Connect
     const config = configService.loadConfig();
     if (config) {
         socketService.connect(config.SIGNALING_SERVER);
@@ -54,7 +54,7 @@ window.onload = async () => {
         dom.passwordModal.style.display = 'flex';
     }
 
-    // 6. Güncelleme Servisi
+    // 6. Update Service
     initAutoUpdateUI({
         btnCheckUpdate: dom.btnCheckUpdate,
         btnInstallUpdate: dom.btnInstallUpdate,
@@ -62,16 +62,16 @@ window.onload = async () => {
         btnConnect: dom.btnConnect
     });
 
-    // 7. Master (Genel) Ses Kontrolü - GainNode Destekli
+    // 7. Master Volume Control - GainNode Supported
     if (dom.masterSlider) {
         dom.masterSlider.addEventListener('input', () => {
             const value = dom.masterSlider.value;
 
-            // DÜZELTME: HTML'deki id="masterVal" ile eşleşmeli
+            // FIX: Must match id="masterVal" in HTML
             const displayEl = document.getElementById('masterVal'); 
             if (displayEl) displayEl.innerText = value + "%";
 
-            // GainNode Güncellemesi
+            // Update GainNode
             const allAudios = document.querySelectorAll('audio');
             for (let id in state.peerGainNodes) {
                 const gainNode = state.peerGainNodes[id];
@@ -88,12 +88,12 @@ window.onload = async () => {
         });
     }
 
-    // --- 8. Mikrofon Kazancı (Mic Ses) ---
+    // 8. Microphone Gain (Mic Volume)
     if (dom.micSlider) {
         dom.micSlider.addEventListener('input', () => {
             const val = dom.micSlider.value;
 
-            // DÜZELTME: HTML'deki id="micVal" ile eşleşmeli
+            // FIX: Must match id="micVal" in HTML
             const displayEl = document.getElementById('micVal');
             if (displayEl) displayEl.innerText = val + "%";
 
@@ -103,19 +103,19 @@ window.onload = async () => {
         });
     }
 
-    // 9. Cihaz Seçimi Değişiklikleri
+    // 9. Device Selection Changes
     if (dom.micSelect) {
         dom.micSelect.addEventListener('change', async () => {
             const deviceId = dom.micSelect.value;
             localStorage.setItem('selectedMic', deviceId);
             console.log("🎤 Mikrofon değiştirildi:", deviceId);
 
-            // Yayındaysak mikrofonu yeniden başlat
+            // Restart microphone if streaming
             if (state.isConnected && state.localStream) {
-                // Önceki stream'i durdur
+                // Stop previous stream
                 state.localStream.getTracks().forEach(track => track.stop());
 
-                // Yeni stream başlat (Seçili ID ile)
+                // Start new stream (with selected ID)
                 await audioEngine.initLocalStream(deviceId);
 
                 alert("Mikrofon değiştirildi. Etkili olması için yeniden bağlanmanız gerekebilir."); 
@@ -123,31 +123,32 @@ window.onload = async () => {
         });
     }
 
+    // 10. Speaker Selection
 if (dom.speakerSelect) {
     dom.speakerSelect.addEventListener('change', () => {
         const deviceId = dom.speakerSelect.value;
         localStorage.setItem('selectedSpeaker', deviceId);
-        audioEngine.setAudioOutputDevice(deviceId); // Yeni hoparlöre yönlendir
+        audioEngine.setAudioOutputDevice(deviceId); // Redirect to new speaker
     });
 }
 };
 
-// --- KATIL BUTONU ---
+// --- JOIN BUTTON ---
 dom.btnConnect.addEventListener('click', async () => {
     const name = dom.inputUsername.value.trim();
     if (!name) return alert("Lütfen bir isim girin!");
 
-    // Ses akışını ve GainNode yapısını başlat
+    // Initialize audio stream and GainNode structure
     const success = await audioEngine.initLocalStream();
     if (success) {
         state.isConnected = true;
         state.currentRoom = dom.roomSelect.value;
         
-        // İsmi kaydet
+        // Save name
         localStorage.setItem('username', name);
         configService.saveSetting('username', name);
         
-        // UI Hazırlıkları
+        // UI Preparations
         dom.btnConnect.style.display = 'none';
         dom.activeControls.style.display = 'flex';
         dom.roomSelect.disabled = true;
@@ -156,49 +157,49 @@ dom.btnConnect.addEventListener('click', async () => {
         dom.btnSend.disabled = false;
         dom.btnShareScreen.disabled = false;
 
-        // Kendi ismini state'e ve listeye ekle
+        // Add own name to state and list
         state.userNames["me"] = name + " (Ben)";
         userList.addUserUI("me", state.userNames["me"], true);
         
-        // Kendi ses görselleştiricini başlat (İşlenmiş stream üzerinden)
+        // Start own audio visualizer (via processed stream)
         visualizer.attachVisualizer(state.processedStream, "me");
 
         socketService.joinRoom(name, state.currentRoom);
     }
 });
 
-// --- DİĞER EVENTLER ---
+// --- OTHER EVENTS ---
 
-// Mikrofon Kapat/Aç
+// Toggle Microphone
 dom.btnToggleMic.addEventListener('click', () => {
     if (state.isDeafened) return alert("Hoparlör kapalı!");
     audioEngine.setMicState(!state.isMicMuted);
 });
 
-// Hoparlör Kapat/Aç (Deafen)
+// Toggle Speaker (Deafen)
 dom.btnToggleSound.addEventListener('click', () => {
     audioEngine.toggleDeafen();
 });
 
-// Ekran Paylaşımı
+// Screen Share
 dom.btnShareScreen.addEventListener('click', () => {
     if (!state.isSharingScreen) screenShare.start();
     else screenShare.stop();
 });
 
-// Chat Mesaj Gönderme
+// Send Chat Message
 dom.btnSend.addEventListener('click', () => chatService.sendChat());
 dom.msgInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') chatService.sendChat();
 });
 
-// Dosya Eki Seçme
+// Select File Attachment
 dom.btnAttach.addEventListener('click', () => {
     if (!state.isConnected) return alert("Önce bir odaya bağlanmalısınız!");
     dom.fileInput.click();
 });
 
-// Dosya Gönderimi
+// File Sending
 dom.fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -219,7 +220,7 @@ dom.fileInput.addEventListener('change', (e) => {
     e.target.value = ''; 
 });
 
-// Ayarlar Paneli
+// Settings Panel
 dom.btnSettings.addEventListener('click', () => {
     const config = configService.getConfig();
     if (config) {
@@ -231,5 +232,5 @@ dom.btnSettings.addEventListener('click', () => {
 
 dom.btnSaveKey.addEventListener('click', () => configService.handleSaveSettings());
 
-// Bağlantıyı Kes (Sayfayı Yenile)
+// Disconnect (Reload Page)
 dom.btnDisconnect.addEventListener('click', () => location.reload());

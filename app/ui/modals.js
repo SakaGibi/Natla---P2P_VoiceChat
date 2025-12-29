@@ -1,11 +1,9 @@
-// modals.js - Ayarlar ve Yayın İzleme Pencere Yönetimi
+// modals.js - Settings & Stream Window Management
 const dom = require('./dom');
 
-/**
- * Modallar için gerekli temel olay dinleyicilerini başlatır
- */
+// Initializes basic event listeners for modals
 function initModals() {
-    // Kapat butonu (Ekran İzleme)
+    // Close button (Stream Watch)
     if (dom.btnCloseStream) {
         dom.btnCloseStream.onclick = () => {
             dom.streamModal.style.display = 'none';
@@ -13,7 +11,7 @@ function initModals() {
         };
     }
 
-    // Ayarlar kapat
+    // Close settings
     if (dom.btnCloseSettings) {
         dom.btnCloseSettings.onclick = () => {
             dom.passwordModal.style.display = 'none';
@@ -21,9 +19,9 @@ function initModals() {
     }
 }
 /**
- * Ayarlar penceresini açar ve mevcut değerleri doldurur
  * @param {Object} configData - Mevcut sunucu ve anahtar bilgileri
  */
+// Opens settings window and fills current values
 function openSettings(configData) {
     if (configData) {
         dom.serverInput.value = configData.SIGNALING_SERVER || "";
@@ -32,22 +30,18 @@ function openSettings(configData) {
     
     dom.passwordModal.style.display = 'flex';
     
-    // Açıldıktan kısa süre sonra ilk inputa odaklan
+    // Focus on first input shortly after opening
     setTimeout(() => {
         if (dom.serverInput) dom.serverInput.focus();
     }, 50);
 }
 
-/**
- * Ayarlar penceresini kapatır
- */
+// Closes settings window
 function closeSettings() {
     dom.passwordModal.style.display = 'none';
 }
 
-/**
- * Yayın izleme penceresini kapatır
- */
+// Closes stream watch window
 function closeStream() {
     dom.streamModal.style.display = 'none';
     dom.largeVideoPlayer.srcObject = null;
