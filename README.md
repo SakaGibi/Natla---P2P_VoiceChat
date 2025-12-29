@@ -104,7 +104,7 @@ To modify the client application or build it from the source:
 ---
 
 ## A NOTE on Development & AI
-This project was built with significant assistance from Large Language Models, as my main priority was to get it working quickly (voice chat + general structure was built in 4-5 hours) for use with my friends. As a result, code cleanliness and architectural best practices were not the primary focus, and you will likely encounter a fair amount of "spaghetti code" throughout the repository. I apologize for the messy implementation; the objective was simply to ensure the platform functions as intended for our use.
+This project was built with significant assistance from Large Language Models, as my main priority was to get it working quickly (voice chat + general structure was built in 4–5 hours) for use with my friends. As a result, code cleanliness and architectural best practices were not the primary focus, and you may still encounter some degree of “spaghetti code” throughout the repository (though much of it has been improved through refactoring). During this refactoring process, the original monolithic renderer was split into multiple smaller, commented files, which slightly increased the complexity of the file structure. Apologies if navigation feels a bit unintuitive — that was not the original goal.
 
 ## License
 
