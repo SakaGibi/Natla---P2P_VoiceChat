@@ -1,8 +1,9 @@
-// index.js - Entry Point
+// index.js - Giriş Noktası
 const { ipcRenderer } = require('electron');
 const path = require('path');
 
 // --- IMPORTS ---
+// index.html kök dizinde olduğu için direkt klasör isimleriyle başlıyoruz
 const dom = require(path.join(__dirname, 'ui/dom'));
 const state = require(path.join(__dirname, 'state/appState'));
 const configService = require(path.join(__dirname, 'config/configService'));
@@ -19,6 +20,7 @@ const { initAutoUpdateUI } = require(path.join(__dirname, 'renderer/autoUpdateRe
 window.onload = async () => {
     // 1. Initialize Modals & Soundpad
     try {
+        // '../ui/modals' yerine 'ui/modals' kullanıyoruz
         const modals = require(path.join(__dirname, 'ui/modals'));
         modals.initModals();
 
@@ -32,9 +34,9 @@ window.onload = async () => {
     try {
         const version = await ipcRenderer.invoke('get-app-version');
         state.currentAppVersion = version;
-        dom.updateStatus.innerText = "Sürüm: " + version;
+        if (dom.updateStatus) dom.updateStatus.innerText = "Sürüm: " + version;
     } catch (err) {
-        dom.updateStatus.innerText = "Sürüm bilgisi alınamadı";
+        if (dom.updateStatus) dom.updateStatus.innerText = "Sürüm bilgisi alınamadı";
     }
 
     // 3. Remember Name
@@ -51,7 +53,7 @@ window.onload = async () => {
     if (config) {
         socketService.connect(config.SIGNALING_SERVER);
     } else {
-        dom.passwordModal.style.display = 'flex';
+        if (dom.passwordModal) dom.passwordModal.style.display = 'flex';
     }
 
     // 6. Update Service
@@ -62,44 +64,30 @@ window.onload = async () => {
         btnConnect: dom.btnConnect
     });
 
-    // 7. Master Volume Control - GainNode Supported
+    // 7. Master Volume Control
     if (dom.masterSlider) {
         dom.masterSlider.addEventListener('input', () => {
             const value = dom.masterSlider.value;
-
-            // FIX: Must match id="masterVal" in HTML
             const displayEl = document.getElementById('masterVal'); 
             if (displayEl) displayEl.innerText = value + "%";
 
-            // Update GainNode
-            const allAudios = document.querySelectorAll('audio');
             for (let id in state.peerGainNodes) {
                 const gainNode = state.peerGainNodes[id];
                 const peerVol = (state.peerVolumes[id] || 100) / 100;
-
                 if (gainNode && state.outputAudioContext) {
-                    gainNode.gain.setTargetAtTime(
-                        (value / 100) * peerVol, 
-                        state.outputAudioContext.currentTime, 
-                        0.01
-                    );
+                    gainNode.gain.setTargetAtTime((value / 100) * peerVol, state.outputAudioContext.currentTime, 0.01);
                 }
             }
         });
     }
 
-    // 8. Microphone Gain (Mic Volume)
+    // 8. Microphone Gain
     if (dom.micSlider) {
         dom.micSlider.addEventListener('input', () => {
             const val = dom.micSlider.value;
-
-            // FIX: Must match id="micVal" in HTML
             const displayEl = document.getElementById('micVal');
             if (displayEl) displayEl.innerText = val + "%";
-
-            if (state.micGainNode) {
-                state.micGainNode.gain.setTargetAtTime(val / 100, 0, 0.01);
-            }
+            if (state.micGainNode) state.micGainNode.gain.setTargetAtTime(val / 100, 0, 0.01);
         });
     }
 
@@ -108,29 +96,48 @@ window.onload = async () => {
         dom.micSelect.addEventListener('change', async () => {
             const deviceId = dom.micSelect.value;
             localStorage.setItem('selectedMic', deviceId);
-            console.log("🎤 Mikrofon değiştirildi:", deviceId);
-
-            // Restart microphone if streaming
             if (state.isConnected && state.localStream) {
-                // Stop previous stream
                 state.localStream.getTracks().forEach(track => track.stop());
-
-                // Start new stream (with selected ID)
                 await audioEngine.initLocalStream(deviceId);
-
-                alert("Mikrofon değiştirildi. Etkili olması için yeniden bağlanmanız gerekebilir."); 
             }
         });
     }
 
-    // 10. Speaker Selection
-if (dom.speakerSelect) {
-    dom.speakerSelect.addEventListener('change', () => {
-        const deviceId = dom.speakerSelect.value;
-        localStorage.setItem('selectedSpeaker', deviceId);
-        audioEngine.setAudioOutputDevice(deviceId); // Redirect to new speaker
-    });
-}
+    if (dom.speakerSelect) {
+        dom.speakerSelect.addEventListener('change', () => {
+            const deviceId = dom.speakerSelect.value;
+            localStorage.setItem('selectedSpeaker', deviceId);
+            audioEngine.setAudioOutputDevice(deviceId);
+        });
+    }
+
+    // 10. Profile Photo (Avatar) Settings
+    const savedAvatar = localStorage.getItem('userAvatar');
+    if (savedAvatar) {
+        state.myAvatar = savedAvatar;
+        if (dom.myAvatarDisplay) dom.myAvatarDisplay.src = savedAvatar;
+    }
+    
+    if (dom.myAvatarDisplay) {
+        dom.myAvatarDisplay.onclick = () => dom.avatarInput.click();
+    }
+
+    if (dom.avatarInput) {
+        dom.avatarInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 100 * 1024) return alert("Fotoğraf 100KB'dan büyük olamaz.");
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const base64 = event.target.result;
+                    state.myAvatar = base64;
+                    dom.myAvatarDisplay.src = base64;
+                    localStorage.setItem('userAvatar', base64);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+    }
 };
 
 // --- JOIN BUTTON ---
@@ -138,17 +145,14 @@ dom.btnConnect.addEventListener('click', async () => {
     const name = dom.inputUsername.value.trim();
     if (!name) return alert("Lütfen bir isim girin!");
 
-    // Initialize audio stream and GainNode structure
     const success = await audioEngine.initLocalStream();
     if (success) {
         state.isConnected = true;
         state.currentRoom = dom.roomSelect.value;
         
-        // Save name
         localStorage.setItem('username', name);
         configService.saveSetting('username', name);
         
-        // UI Preparations
         dom.btnConnect.style.display = 'none';
         dom.activeControls.style.display = 'flex';
         dom.roomSelect.disabled = true;
@@ -157,70 +161,63 @@ dom.btnConnect.addEventListener('click', async () => {
         dom.btnSend.disabled = false;
         dom.btnShareScreen.disabled = false;
 
-        // Add own name to state and list
         state.userNames["me"] = name + " (Ben)";
-        userList.addUserUI("me", state.userNames["me"], true);
+        userList.addUserUI("me", state.userNames["me"], true, state.myAvatar);
         
-        // Start own audio visualizer (via processed stream)
         visualizer.attachVisualizer(state.processedStream, "me");
 
-        socketService.joinRoom(name, state.currentRoom);
+        socketService.joinRoom(name, state.currentRoom, state.myAvatar);
+
+        setTimeout(() => {
+            audioEngine.setMicState(state.isMicMuted);
+            if(state.isDeafened) {
+                const socketService = require('../socket/socketService');
+                socketService.send({ type: 'mic-status', isMuted: true });
+            }
+        }, 500);
     }
 });
 
 // --- OTHER EVENTS ---
-
-// Toggle Microphone
 dom.btnToggleMic.addEventListener('click', () => {
     if (state.isDeafened) return alert("Hoparlör kapalı!");
     audioEngine.setMicState(!state.isMicMuted);
 });
 
-// Toggle Speaker (Deafen)
 dom.btnToggleSound.addEventListener('click', () => {
     audioEngine.toggleDeafen();
 });
 
-// Screen Share
 dom.btnShareScreen.addEventListener('click', () => {
     if (!state.isSharingScreen) screenShare.start();
     else screenShare.stop();
 });
 
-// Send Chat Message
 dom.btnSend.addEventListener('click', () => chatService.sendChat());
 dom.msgInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') chatService.sendChat();
 });
 
-// Select File Attachment
 dom.btnAttach.addEventListener('click', () => {
     if (!state.isConnected) return alert("Önce bir odaya bağlanmalısınız!");
     dom.fileInput.click();
 });
 
-// File Sending
 dom.fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
-    const MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
-    if (file.size > MAX_SIZE) {
-        alert("Dosya 2GB'dan büyük olamaz.");
-        return;
-    }
+    const MAX_SIZE = 2 * 1024 * 1024 * 1024; 
+    if (file.size > MAX_SIZE) return alert("Dosya 2GB'dan büyük olamaz.");
     
     const fileTransfer = require(path.join(__dirname, 'files/fileTransfer'));
     const tId = "transfer-" + Date.now();
-    
     fileTransfer.addFileSentUI(file, tId);
     for (let id in state.peers) { 
-        fileTransfer.sendFile(state.peers[id], file, tId); 
+        fileTransfer.sendFile(state.peers[id], file, tId);
     }
     e.target.value = ''; 
 });
 
-// Settings Panel
 dom.btnSettings.addEventListener('click', () => {
     const config = configService.getConfig();
     if (config) {
@@ -231,6 +228,4 @@ dom.btnSettings.addEventListener('click', () => {
 });
 
 dom.btnSaveKey.addEventListener('click', () => configService.handleSaveSettings());
-
-// Disconnect (Reload Page)
 dom.btnDisconnect.addEventListener('click', () => location.reload());

@@ -12,7 +12,9 @@
 <div class="sidebar">
     <!-- Header Row -->
     <div class="header-row">
-        <h1>Natla</h1> 
+        <div class="profile-section">
+            <h1>Natla</h1>
+        </div>
         <button id="btnSettings" title="Sunucu Ayarları">⚙️</button>
     </div>
 
@@ -49,7 +51,11 @@
         <div id="roomPreview" style="font-size: 12px; color: #aaa;  flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 5px; pointer-events: none;">
             Sunucuya bağlanılıyor...
         </div>
-        <input type="text" id="username" placeholder="Adınız" class="compact-input">
+        <div style="display: flex; align-items: center;">
+            <input type="file" id="avatarInput" accept="image/*" style="display: none;">
+            <img id="myAvatarDisplay" src="assets/default-avatar.png" class="my-avatar-btn" title="Fotoğraf Değiştir">
+            <input type="text" id="username" placeholder="Adınız" class="compact-input">
+        </div>
     </div>
     
     <!-- Connection Status -->

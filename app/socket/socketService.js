@@ -96,16 +96,15 @@ function handleMessage(data) {
         case 'room-users': 
         case 'user-list':
             state.allUsers = data.users;
-            
             if (roomPreview) roomPreview.updateRoomPreview();
-            
+    
             if (state.isConnected) {
                 data.users.forEach(u => { 
                     if (u.id !== state.myPeerId) {
                         state.userNames[u.id] = u.name;
-                        userList.addUserUI(u.id, u.name, true);
-                        
-                        // [FIX]: ID Comparison Initiation
+                        // [GÜNCELLEME]: Avatar parametresini gönderiyoruz
+                        userList.addUserUI(u.id, u.name, false, u.avatar); 
+                
                         if (shouldIInitiate(state.myPeerId, u.id)) {
                             peerService.createPeer(u.id, u.name, true);
                         }
@@ -118,12 +117,12 @@ function handleMessage(data) {
             if (data.id === state.myPeerId) return;
             
             state.userNames[data.id] = data.name;
-            userList.addUserUI(data.id, data.name, true);
+            userList.addUserUI(data.id, data.name, false, data.avatar);
             audioEngine.playSystemSound('join');
             
             // [FIX]: ID Comparison Initiation
             if (shouldIInitiate(state.myPeerId, data.id)) {
-                peerService.createPeer(data.id, data.name, true);
+                peerService.createPeer(data.id, data.name, true, data.avatar);
             }
             break;
 
@@ -170,7 +169,7 @@ function shouldIInitiate(myId, targetId) {
 }
 
 // Join Room Request
-function joinRoom(name, room) {
+function joinRoom(name, room, avatar) {
     const accessKey = state.configData && state.configData.ACCESS_KEY 
                       ? state.configData.ACCESS_KEY.trim() 
                       : null;
@@ -179,7 +178,8 @@ function joinRoom(name, room) {
         type: 'join', 
         name: name,
         room: room,
-        key: accessKey 
+        key: accessKey,
+        avatar: avatar
     };
     
     send(payload);

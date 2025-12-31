@@ -73,8 +73,8 @@ async function initLocalStream(deviceId = null) {
         const stream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
                 deviceId: deviceId ? { exact: deviceId } : undefined,
-                echoCancellation: true,
-                noiseSuppression: true,
+                echoCancellation: true, // noise cancellation
+                noiseSuppression: true, // noise suppression
                 autoGainControl: false 
             }, 
             video: false 
@@ -210,30 +210,29 @@ async function setAudioOutputDevice(deviceId) {
 function setMicState(muted) {
     state.isMicMuted = muted;
 
-    // Toggle Tracks
     if (state.localStream) {
-        state.localStream.getAudioTracks().forEach(track => {
-            track.enabled = !muted;
-        });
+        state.localStream.getAudioTracks().forEach(track => track.enabled = !muted);
     }
 
-    // Update UI
+    // UI Güncelleme (Buton)
     if (dom.btnToggleMic) {
         dom.btnToggleMic.innerText = muted ? '🎤✖' : '🎤';
         dom.btnToggleMic.classList.toggle('btn-closed', muted);
-        dom.btnToggleMic.title = muted ? "Mikrofon Kapalı" : "Mikrofon Açık";
     }
 
+    // --- KRİTİK DÜZELTME ---
+    // Durumu hem sunucuya hem peerlara gönder
     try {
         const socketService = require('../socket/socketService');
+        const peerService = require('../webrtc/peerService');
         if (state.isConnected) {
-            socketService.send({
-                type: 'mic-status',
-                isMuted: muted
-            });
+            const payload = { type: 'mic-status', isMuted: muted };
+            socketService.send(payload); // Sunucu üzerinden relay
+            peerService.broadcast(payload); // P2P üzerinden direkt
         }
     } catch (e) { }
     
+    // Kendi kartını güncelle
     const userList = require('../ui/userList');
     userList.updateMicStatusUI("me", muted);
 }
@@ -243,34 +242,33 @@ function toggleDeafen() {
     state.isDeafened = !state.isDeafened;
     const isDeaf = state.isDeafened;
 
-    // Update UI
     if (dom.btnToggleSound) {
         dom.btnToggleSound.innerText = isDeaf ? '🔇' : '🔊';
         dom.btnToggleSound.classList.toggle('btn-closed', isDeaf);
-        dom.btnToggleSound.title = isDeaf ? "Ses Kapalı" : "Ses Açık";
     }
 
-    // Mute All Audio Elements
     const allAudios = document.querySelectorAll('audio');
-    allAudios.forEach(audio => {
-        audio.muted = isDeaf; 
-    });
+    allAudios.forEach(audio => { audio.muted = isDeaf; });
     
-    // Auto Mute Mic if Deafened
     if (isDeaf && !state.isMicMuted) {
         setMicState(true); 
     }
 
-    // Notify Peers
+    // --- KRİTİK DÜZELTME ---
+    // Kendi kartındaki dataset'i güncelle ki ikon hemen düzelsin
+    const userList = require('../ui/userList');
+    userList.updateDeafenStatusUI("me", isDeaf);
+
+    // Sağırlaşma durumunu hem sunucuya hem peerlara bildir
     try {
+        const socketService = require('../socket/socketService');
         const peerService = require('../webrtc/peerService');
         if (state.isConnected) {
-            peerService.broadcast({
-                type: 'deafen-status',
-                isDeafened: isDeaf
-            });
+            const payload = { type: 'deafen-status', isDeafened: isDeaf };
+            socketService.send(payload); // Güvenli kanal (Sunucu)
+            peerService.broadcast(payload); // Hızlı kanal (P2P)
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { }
 }
 
 module.exports = {

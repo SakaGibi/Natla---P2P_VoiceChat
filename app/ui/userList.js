@@ -2,128 +2,164 @@
 const state = require('../state/appState');
 const dom = require('./dom');
 
-// Adds a new card to the user list or updates an existing one
-function addUserUI(id, name, isConnected) {
+/**
+ * Adds a new card to the user list or updates an existing one.
+ * @param {string} id - Unique identifier for the user.
+ * @param {string} name - Display name.
+ * @param {boolean} isConnected - Connection status (Live/Connecting).
+ * @param {string} avatar - Base64 string or image path.
+ */
+function addUserUI(id, name, isConnected, avatar = null) {
     let el = document.getElementById(`user-${id}`);
-    const statusText = isConnected ? 'Canlı' : 'Bağlanıyor...';
-    const statusColor = isConnected ? '#2ecc71' : '#f1c40f';
+    const avatarSrc = avatar || 'assets/default-avatar.png';
     
-    // If card exists, only update status
+    // If card exists, update image and status, then exit
     if (el) {
-        const statusSpan = el.querySelector('.user-status');
-        if (statusSpan) {
-            statusSpan.innerText = statusText;
-            statusSpan.style.color = statusColor;
-        }
+        const imgEl = el.querySelector('.user-avatar-list');
+        if (imgEl && avatar) imgEl.src = avatar;
+
+        updateUserStatusUI(id, isConnected);
         return;
     }
     
-    // Create new card
+    // Initialize a new user card
     el = document.createElement('div'); 
     el.id = `user-${id}`; 
     el.className = 'user-card'; 
-    el.dataset.isMuted = 'false';
-    el.dataset.isDeafened = 'false';
     
-    // FIX: dom.userListDiv -> dom.userList
+    // Set initial data states
+    el.dataset.isMuted = id === 'me' ? state.isMicMuted : 'false';
+    el.dataset.isDeafened = id === 'me' ? state.isDeafened : 'false';
+    
     if (dom.userList) {
         dom.userList.appendChild(el);
     } else {
-        console.error("ERROR: dom.userList not found!");
+        console.error("ERROR: dom.userList reference not found!");
         return;
     }
     
-    // Add volume control for other users
+    // Define initial icons based on current state
+    const initialMic = id === 'me' ? (state.isMicMuted ? '❌' : '🎤') : '🎤';
+    const initialDeaf = id === 'me' ? (state.isDeafened ? '🔇' : '🔊') : '🔊';
+
+    // Volume control for remote users
     let volHTML = id !== 'me' ? `
-    <div class="user-volume" style="display:flex; width:100%; align-items:center; gap:5px;">
-        <label>🔊</label>
-        <input type="range" 
-               style="flex:1; width:100%; cursor:pointer;" 
-               min="0" max="300" value="100" 
-               id="vol-slider-${id}"
-               class="peer-volume-slider">
-        <span id="vol-val-${id}" style="font-size:11px; width:35px; text-align:right;">100%</span>
-    </div>` : '';
+    <div class="user-volume-row">
+        <input type="range" min="0" max="300" value="100" id="vol-slider-${id}" class="peer-volume-slider">
+        <span id="vol-val-${id}" class="vol-label">100%</span>
+    </div>` : '<div style="height:12px;"></div>'; 
     
-    // Create card structure (Mic icon, name, and VU meter)
+    // Main Card Structure
     el.innerHTML = `
-        <div class="user-info">
-            ${id !== 'me' ? '<span class="mic-icon">🎤</span>' : ''}
-            <span class="user-name">${name}</span>
-            <span class="user-status" style="color:${statusColor}">${statusText}</span>
-        </div>
-        ${volHTML}
-        <div class="meter-bg">
-            <div id="meter-fill-${id}" class="meter-fill"></div>
+        <img src="${avatarSrc}" class="user-avatar-list">
+        <div class="user-details">
+            <div class="user-header">
+                <span class="user-name">${name}</span>
+                <div class="status-indicators">
+                    <span id="mic-icon-${id}" class="status-icon">${initialMic}</span>
+                    <span id="deaf-icon-${id}" class="status-icon">${initialDeaf}</span>
+                    <span class="user-status"></span>
+                </div>
+            </div>
+            <div class="user-controls-centered">
+                ${volHTML}
+                <div class="meter-bg">
+                    <div id="meter-fill-${id}" class="meter-fill"></div>
+                </div>
+            </div>
         </div>
     `;
 
-    // Add event listener for volume slider
+    // Apply the initial connection status
+    updateUserStatusUI(id, isConnected);
+
+    // Initialize volume slider listener for peers
     if (id !== 'me') {
         const slider = el.querySelector('.peer-volume-slider');
-        // updatePeerVolume updates both audio and percentage text
         slider.oninput = (e) => updatePeerVolume(id, e.target.value);
     }
 
-    // If user is already sharing screen, add button
+    // Check if user is already sharing screen
     if (state.activeRemoteStreams[id]) {
         addVideoElement(id, state.activeRemoteStreams[id]);
     }
 }
 
-// Helper to update icon based on state
-function updateUserIcon(id) {
+/**
+ * Updates the connection status label (Live / Connecting...)
+ */
+function updateUserStatusUI(id, isConnected) {
     const el = document.getElementById(`user-${id}`);
     if (!el) return;
 
-    let mic = el.querySelector('.mic-icon');
-    if (!mic && id !== 'me') {
-        mic = document.createElement('span'); 
-        mic.className = 'mic-icon'; 
-        el.querySelector('.user-info').prepend(mic); 
-    }
-
-    if (mic) {
-        const isMuted = el.dataset.isMuted === 'true';
-        const isDeafened = el.dataset.isDeafened === 'true';
-
-        if (isDeafened) {
-            mic.innerText = '🔇';
-            mic.style.color = '#8b281d';
-        } else if (isMuted) {
-            mic.innerText = '❌';
-            mic.style.color = '#8b281d';
-        } else {
-            mic.innerText = '🎤';
-            mic.style.color = '#2ecc71';
-        }
+    const statusSpan = el.querySelector('.user-status');
+    if (statusSpan) {
+        statusSpan.innerText = isConnected ? 'Canlı' : 'Bağlanıyor...';
+        statusSpan.style.color = isConnected ? '#2ecc71' : '#f1c40f';
     }
 }
 
-// Updates the mic icon in UI when user toggles mute
+/**
+ * Updates status icons based on card datasets.
+ * Shows only one icon (🔇) when deafened to prevent clutter.
+ */
+function updateUserIcon(id) {
+    const micEl = document.getElementById(`mic-icon-${id}`);
+    const deafEl = document.getElementById(`deaf-icon-${id}`);
+    const card = document.getElementById(`user-${id}`);
+    
+    if (!micEl || !deafEl || !card) return;
+
+    const isMuted = card.dataset.isMuted === 'true';
+    const isDeafened = card.dataset.isDeafened === 'true';
+
+    if (isDeafened) {
+        micEl.innerText = '🔇';
+        micEl.style.color = '#ff4757';
+        deafEl.innerText = ''; // Hide the second slot
+    } else {
+        micEl.innerText = isMuted ? '❌' : '🎤';
+        micEl.style.color = isMuted ? '#ff4757' : '#2ecc71';
+
+        deafEl.innerText = '🔊';
+        deafEl.style.color = '#2ecc71';
+    }
+}
+
+/**
+ * Triggered when microphone status changes.
+ */
 function updateMicStatusUI(id, isMuted) {
     const el = document.getElementById(`user-${id}`); 
-    if (el) el.dataset.isMuted = isMuted;
-    updateUserIcon(id);
+    if (el) {
+        el.dataset.isMuted = isMuted;
+        updateUserIcon(id);
+    }
 }
 
-// Updates the deafen icon in UI
+/**
+ * Triggered when deafen/speaker status changes.
+ */
 function updateDeafenStatusUI(id, isDeafened) {
     const el = document.getElementById(`user-${id}`);
-    if (el) el.dataset.isDeafened = isDeafened;
-    updateUserIcon(id);
+    if (el) {
+        el.dataset.isDeafened = isDeafened;
+        updateUserIcon(id);
+    }
 }
 
-// Sets the volume level for a specific user
+/**
+ * Updates volume for a specific peer and adjusts GainNode.
+ */
 function updatePeerVolume(id, value) {
     if (!state.peerVolumes) state.peerVolumes = {};
     state.peerVolumes[id] = value;
 
-    // 1. Update percentage text next to slider
+    // Update UI text
     const textEl = document.getElementById(`vol-val-${id}`);
     if (textEl) textEl.innerText = value + "%";
 
-    // 2. GainNode (Volume Boost) Setting
+    // Handle GainNode volume boost
     const gainNode = state.peerGainNodes[id];
     if (gainNode && state.outputAudioContext) {
         const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1;
@@ -140,7 +176,9 @@ function updatePeerVolume(id, value) {
 // Expose to window for HTML access
 window.updatePeerVolume = updatePeerVolume;
 
-// Adds 'WATCH' button to user card
+/**
+ * Adds 'WATCH' button to user card when screen sharing starts.
+ */
 function addVideoElement(id, stream) {
     state.activeRemoteStreams[id] = stream;
     const card = document.getElementById(`user-${id}`);
@@ -148,18 +186,19 @@ function addVideoElement(id, stream) {
     if (card && !card.querySelector('.stream-icon-btn')) {
         const btn = document.createElement('button'); 
         btn.className = 'stream-icon-btn'; 
-        btn.innerHTML = '🖥️ İZLE';
+        btn.innerHTML = '🖥️ WATCH';
         btn.onclick = () => openStreamModal(id);
         card.appendChild(btn);
     }
 
-    // Remove button if stream ends
     if (stream.getVideoTracks().length > 0) {
         stream.getVideoTracks()[0].onended = () => removeVideoElement(id);
     }
 }
 
-// Clears stream watch button and modal
+/**
+ * Removes video button and closes modal if active.
+ */
 function removeVideoElement(id) {
     delete state.activeRemoteStreams[id];
     const card = document.getElementById(`user-${id}`); 
@@ -168,10 +207,8 @@ function removeVideoElement(id) {
         if (btn) btn.remove();
     }
     
-    // dom.streamerNameLabel might not exist in dom.js, selecting manually:
     const streamerLabel = document.getElementById('streamerName');
 
-    // Close modal if this person's stream is open
     if (dom.streamModal && dom.streamModal.style.display !== 'none' && 
         streamerLabel && streamerLabel.getAttribute('data-id') === id) {
         
@@ -180,29 +217,31 @@ function removeVideoElement(id) {
     }
 }
 
-// Opens stream watch window (Modal)
+/**
+ * Opens the stream watch window (Modal).
+ */
 function openStreamModal(id) {
-    if (!state.activeRemoteStreams[id]) return alert("Yayın yok");
+    if (!state.activeRemoteStreams[id]) return alert("No active stream found.");
     
-    // Select elements safely
     const streamerLabel = document.getElementById('streamerName');
 
     if (dom.largeVideoPlayer) dom.largeVideoPlayer.srcObject = state.activeRemoteStreams[id];
     
     if (streamerLabel) {
-        streamerLabel.innerText = `${state.userNames[id] || 'Biri'} Ekranı`;
+        streamerLabel.innerText = `${state.userNames[id] || 'User'}'s Screen`;
         streamerLabel.setAttribute('data-id', id);
     }
     
     if (dom.streamModal) dom.streamModal.style.display = 'flex';
 }
 
-// Removes user card from list
+/**
+ * Removes the user card and related audio elements.
+ */
 function removeUserUI(id) {
     const el = document.getElementById(`user-${id}`);
     if (el) el.remove();
     
-    // Clean up audio element
     const audio = document.getElementById(`audio-${id}`);
     if (audio) audio.remove();
 }
@@ -215,5 +254,6 @@ module.exports = {
     addVideoElement,
     removeVideoElement,
     openStreamModal,
-    updatePeerVolume
+    updatePeerVolume,
+    updateUserStatusUI
 };

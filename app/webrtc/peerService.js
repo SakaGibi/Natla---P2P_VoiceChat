@@ -35,6 +35,14 @@ function createPeer(targetId, name, initiator) {
             }); 
         });
 
+        // Connection Status
+        peer.on('connect', () => {
+            console.log(`🤝 P2P connected with ${targetId}`);
+            // Bağlantı tam olarak sağlandığında UI'ı "Live" yapıyoruz
+            const userList = require('../ui/userList');
+            userList.updateUserStatusUI(targetId, true);
+        });
+
         // Media Stream
         peer.on('stream', stream => {
             console.log(`📡 ${targetId} kullanıcısından akış alındı.`);
@@ -131,9 +139,12 @@ function broadcast(payload) {
     const jsonPayload = JSON.stringify(payload);
     for (let id in state.peers) { 
         try { 
-            state.peers[id].send(jsonPayload); 
+            // SADECE kanal açıksa gönder (Kritik hata düzeltmesi)
+            if (state.peers[id] && state.peers[id].connected) {
+                state.peers[id].send(jsonPayload); 
+            }
         } catch (e) { 
-            console.error(`Broadcast hatası (${id}):`, e);
+            console.error(`Broadcast error (${id}):`, e);
         } 
     }
 }

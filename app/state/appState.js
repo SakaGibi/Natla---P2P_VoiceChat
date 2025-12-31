@@ -43,5 +43,10 @@ module.exports = {
     activeIncomingTransferIds: {}, // SenderId -> TransferId mapping
     
     // UI Helpers
-    statusTimeout: null // Timer to clear status messages
+    statusTimeout: null, // Timer to clear status messages
+
+    // Profile Elements
+    myAvatar: null, // User's avatar image data (base64)
+    allUsersAvatars: {} // User ID -> Avatar image data (base64)
+
 };

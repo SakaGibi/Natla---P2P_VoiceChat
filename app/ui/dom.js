@@ -25,7 +25,7 @@ const dom = {
     fileInput: document.getElementById('fileInput'),
     
     // User List
-    userList: document.getElementById('userList'), // Used by userList.js
+    userList: document.getElementById('userList'),
     audioContainer: document.getElementById('audioContainer'),
     
     // Settings Modal
@@ -52,7 +52,11 @@ const dom = {
     streamModal: document.getElementById('streamModal'),
     btnCloseStream: document.getElementById('btnCloseStream'),
     largeVideoPlayer: document.getElementById('largeVideoPlayer'),
-    streamerNameLabel: document.getElementById('streamerName') // Added for safety
+    streamerNameLabel: document.getElementById('streamerName'),
+
+    // profile elemts
+    avatarInput: document.getElementById('avatarInput'),
+    myAvatarDisplay: document.getElementById('myAvatarDisplay'),
 };
 
 module.exports = dom;
