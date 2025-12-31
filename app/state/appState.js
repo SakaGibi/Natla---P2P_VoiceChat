@@ -29,6 +29,7 @@ module.exports = {
 
     audioContext: null, // Input audio processing context
     outputAudioContext: null, // Output audio processing context
+    streamDestination: null, // WebRTC stream destination node (for mixing soundpad)
 
     micGainNode: null, // Own mic volume (Gain) node
     peerGainNodes: {}, // Peer volume nodes

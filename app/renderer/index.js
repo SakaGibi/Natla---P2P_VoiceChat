@@ -3,7 +3,6 @@ const { ipcRenderer } = require('electron');
 const path = require('path');
 
 // --- IMPORTS ---
-// index.html kök dizinde olduğu için direkt klasör isimleriyle başlıyoruz
 const dom = require(path.join(__dirname, 'ui/dom'));
 const state = require(path.join(__dirname, 'state/appState'));
 const configService = require(path.join(__dirname, 'config/configService'));
@@ -20,12 +19,17 @@ const { initAutoUpdateUI } = require(path.join(__dirname, 'renderer/autoUpdateRe
 window.onload = async () => {
     // 1. Initialize Modals & Soundpad
     try {
-        // '../ui/modals' yerine 'ui/modals' kullanıyoruz
         const modals = require(path.join(__dirname, 'ui/modals'));
         modals.initModals();
 
         const soundEffects = require(path.join(__dirname, 'audio/soundEffects'));
         soundEffects.initSoundpad();
+
+        if (dom.btnResetSoundpad) {
+            dom.btnResetSoundpad.addEventListener('click', () => {
+                soundEffects.resetSoundMap();
+            });
+        }
     } catch (err) {
         console.error("❌ Başlatma hatası (Modals/Soundpad):", err);
     }
@@ -42,7 +46,7 @@ window.onload = async () => {
     // 3. Remember Name
     const savedName = localStorage.getItem('username');
     if (savedName && dom.inputUsername) {
-        dom.inputUsername.value = savedName; 
+        dom.inputUsername.value = savedName;
     }
 
     // 4. List Devices
@@ -68,7 +72,7 @@ window.onload = async () => {
     if (dom.masterSlider) {
         dom.masterSlider.addEventListener('input', () => {
             const value = dom.masterSlider.value;
-            const displayEl = document.getElementById('masterVal'); 
+            const displayEl = document.getElementById('masterVal');
             if (displayEl) displayEl.innerText = value + "%";
 
             for (let id in state.peerGainNodes) {
@@ -117,7 +121,7 @@ window.onload = async () => {
         state.myAvatar = savedAvatar;
         if (dom.myAvatarDisplay) dom.myAvatarDisplay.src = savedAvatar;
     }
-    
+
     if (dom.myAvatarDisplay) {
         dom.myAvatarDisplay.onclick = () => dom.avatarInput.click();
     }
@@ -149,10 +153,10 @@ dom.btnConnect.addEventListener('click', async () => {
     if (success) {
         state.isConnected = true;
         state.currentRoom = dom.roomSelect.value;
-        
+
         localStorage.setItem('username', name);
         configService.saveSetting('username', name);
-        
+
         dom.btnConnect.style.display = 'none';
         dom.activeControls.style.display = 'flex';
         dom.roomSelect.disabled = true;
@@ -163,14 +167,14 @@ dom.btnConnect.addEventListener('click', async () => {
 
         state.userNames["me"] = name + " (Ben)";
         userList.addUserUI("me", state.userNames["me"], true, state.myAvatar);
-        
+
         visualizer.attachVisualizer(state.processedStream, "me");
 
         socketService.joinRoom(name, state.currentRoom, state.myAvatar);
 
         setTimeout(() => {
             audioEngine.setMicState(state.isMicMuted);
-            if(state.isDeafened) {
+            if (state.isDeafened) {
                 const socketService = require('../socket/socketService');
                 socketService.send({ type: 'mic-status', isMuted: true });
             }
@@ -206,16 +210,16 @@ dom.btnAttach.addEventListener('click', () => {
 dom.fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const MAX_SIZE = 2 * 1024 * 1024 * 1024; 
+    const MAX_SIZE = 2 * 1024 * 1024 * 1024;
     if (file.size > MAX_SIZE) return alert("Dosya 2GB'dan büyük olamaz.");
-    
+
     const fileTransfer = require(path.join(__dirname, 'files/fileTransfer'));
     const tId = "transfer-" + Date.now();
     fileTransfer.addFileSentUI(file, tId);
-    for (let id in state.peers) { 
+    for (let id in state.peers) {
         fileTransfer.sendFile(state.peers[id], file, tId);
     }
-    e.target.value = ''; 
+    e.target.value = '';
 });
 
 dom.btnSettings.addEventListener('click', () => {

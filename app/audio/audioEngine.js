@@ -4,7 +4,7 @@ const dom = require('../ui/dom');
 const state = require('../state/appState');
 
 // --- FILE PATH FINDER ---
-function getAssetPath(fileName) {    
+function getAssetPath(fileName) {
     let assetPath = path.join(__dirname, '..', 'assets', fileName);
 
     // Handle asar unpacking
@@ -28,38 +28,76 @@ function playSystemSound(type) {
     try {
         const soundPath = getAssetPath(fileName);
         const audio = new Audio(soundPath);
-        
+
         // Set volume
         audio.volume = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
-        
+
         // Set output device
         if (dom.speakerSelect && dom.speakerSelect.value && typeof audio.setSinkId === 'function') {
-            audio.setSinkId(dom.speakerSelect.value).catch(e => {});
+            audio.setSinkId(dom.speakerSelect.value).catch(e => { });
         }
-        
-        audio.play().catch(() => {});
+
+        audio.play().catch(() => { });
     } catch (e) { console.error(e); }
 }
 
 // --- LOCAL SOUND EFFECTS (Soundpad) ---
-function playLocalSound(effectName) {
+function playLocalSound(effectName, isCustomPath = false) {
     if (state.isDeafened) return;
     try {
-        const fileName = effectName.endsWith('.mp3') ? effectName : `${effectName}.mp3`;
-        const soundPath = getAssetPath(fileName);
-        
-        const audio = new Audio(soundPath);
-        
-        // Set volume
-        audio.volume = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
-        
-        // Set output device
-        if (dom.speakerSelect && dom.speakerSelect.value && typeof audio.setSinkId === 'function') {
-            audio.setSinkId(dom.speakerSelect.value).catch(e => {});
+        let soundPath;
+        if (isCustomPath) {
+            soundPath = effectName; // Full path provided
+        } else {
+            const fileName = effectName.endsWith('.mp3') ? effectName : `${effectName}.mp3`;
+            soundPath = getAssetPath(fileName);
         }
 
-        audio.play().catch(() => {});
-    } catch (e) { }
+        const audio = new Audio(soundPath);
+
+        // Volume logic
+        const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
+        audio.volume = masterVol;
+
+        // Output device (Speakers)
+        if (dom.speakerSelect && dom.speakerSelect.value && typeof audio.setSinkId === 'function') {
+            audio.setSinkId(dom.speakerSelect.value).catch(e => { });
+        }
+
+        // --- BROADCAST TO PEERS ---
+        // We capture the audio element and mix it into the WebRTC stream
+        if (state.audioContext && state.streamDestination) {
+            try {
+                // We must create a robust source. 
+                // Note: MediaElementSource needs the element to be playing or loaded.
+                // Re-using options or handling potential CORS issues (not issue for local files usually).
+
+                const source = state.audioContext.createMediaElementSource(audio);
+                const gain = state.audioContext.createGain();
+
+                // Adjust volume for peers (optional, using same master vol is fine usually)
+                gain.gain.value = 1.0;
+
+                // Connect to Stream Destination (Peers hear this)
+                source.connect(gain);
+                gain.connect(state.streamDestination);
+
+                // Connect to Local Destination (I hear this)
+                // Note: creating MediaElementSource DISCONNECTS it from default output.
+                // We MUST re-connect to destination for local playback.
+                source.connect(state.audioContext.destination);
+            } catch (err) {
+                console.error("Audio mixing error:", err);
+                // If mixing fails, at least play locally (default behavior if source creation fails is tricky)
+                // If createMediaElementSource threw, audio might still play or not.
+                // Usually safe to just play().
+            }
+        }
+
+        audio.play().catch(e => console.error("Play error:", e));
+    } catch (e) {
+        console.error("Soundpad error:", e);
+    }
 }
 
 // --- INITIALIZE MICROPHONE (Local Stream) ---
@@ -70,21 +108,21 @@ async function initLocalStream(deviceId = null) {
         }
 
         // Get User Media
-        const stream = await navigator.mediaDevices.getUserMedia({ 
+        const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 deviceId: deviceId ? { exact: deviceId } : undefined,
                 echoCancellation: true, // noise cancellation
                 noiseSuppression: true, // noise suppression
-                autoGainControl: false 
-            }, 
-            video: false 
+                autoGainControl: false
+            },
+            video: false
         });
-        
+
         state.localStream = stream;
 
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         state.audioContext = new AudioContext();
-        
+
         if (state.audioContext.state === 'suspended') {
             await state.audioContext.resume();
         }
@@ -92,7 +130,7 @@ async function initLocalStream(deviceId = null) {
         // Create Source & Gain Node
         const source = state.audioContext.createMediaStreamSource(stream);
         const gainNode = state.audioContext.createGain();
-        
+
         // Set Initial Gain
         const initialGain = dom.micSlider ? (dom.micSlider.value / 100) : 1.0;
         gainNode.gain.value = initialGain;
@@ -100,14 +138,16 @@ async function initLocalStream(deviceId = null) {
 
         // Connect Nodes
         const destination = state.audioContext.createMediaStreamDestination();
-        
+        state.streamDestination = destination; // SAVE REFERENCE FOR SOUNDPAD
+
         source.connect(gainNode);
         gainNode.connect(destination);
 
         state.processedStream = destination.stream;
         return true;
     } catch (e) {
-        alert("Mikrofon başlatılamadı!");
+        alert("Mikrofon başlatılamadı veya erişim reddedildi!");
+        console.error(e);
         return false;
     }
 }
@@ -118,16 +158,16 @@ function addAudioElement(id, stream) {
     if (!audioEl) {
         audioEl = document.createElement('audio');
         audioEl.id = `audio-${id}`;
-        audioEl.autoplay = true; 
+        audioEl.autoplay = true;
         document.body.appendChild(audioEl);
     }
 
     // Anchor Audio (Keep stream active)
     const anchorAudio = document.createElement('audio');
     anchorAudio.srcObject = stream;
-    anchorAudio.muted = true; 
-    anchorAudio.play().catch(() => {});
-    audioEl._anchor = anchorAudio; 
+    anchorAudio.muted = true;
+    anchorAudio.play().catch(() => { });
+    audioEl._anchor = anchorAudio;
 
     // Initialize Output Context
     if (!state.outputAudioContext) {
@@ -152,20 +192,20 @@ function addAudioElement(id, stream) {
         // Calculate Volume
         const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
         const peerVol = (state.peerVolumes && state.peerVolumes[id]) ? (state.peerVolumes[id] / 100) : 1.0;
-        
+
         gainNode.gain.value = masterVol * peerVol;
         state.peerGainNodes[id] = gainNode;
 
         // Connect to Element
         audioEl.srcObject = destination.stream;
-        audioEl.volume = 1.0; 
+        audioEl.volume = 1.0;
 
         // Set Output Device
         if (dom.speakerSelect && dom.speakerSelect.value && typeof audioEl.setSinkId === 'function') {
-            audioEl.setSinkId(dom.speakerSelect.value).catch(() => {});
+            audioEl.setSinkId(dom.speakerSelect.value).catch(() => { });
         }
 
-        audioEl.play().catch(() => {});
+        audioEl.play().catch(() => { });
 
     } catch (err) {
         // Fallback
@@ -196,13 +236,13 @@ async function setAudioOutputDevice(deviceId) {
     const allAudios = document.querySelectorAll('audio');
     allAudios.forEach(audio => {
         if (typeof audio.setSinkId === 'function') {
-            audio.setSinkId(deviceId).catch(() => {});
+            audio.setSinkId(deviceId).catch(() => { });
         }
     });
 
     // Update Context Output
     if (state.outputAudioContext && typeof state.outputAudioContext.setSinkId === 'function') {
-        state.outputAudioContext.setSinkId(deviceId).catch(() => {});
+        state.outputAudioContext.setSinkId(deviceId).catch(() => { });
     }
 }
 
@@ -231,7 +271,7 @@ function setMicState(muted) {
             peerService.broadcast(payload); // P2P üzerinden direkt
         }
     } catch (e) { }
-    
+
     // Kendi kartını güncelle
     const userList = require('../ui/userList');
     userList.updateMicStatusUI("me", muted);
@@ -249,9 +289,9 @@ function toggleDeafen() {
 
     const allAudios = document.querySelectorAll('audio');
     allAudios.forEach(audio => { audio.muted = isDeaf; });
-    
+
     if (isDeaf && !state.isMicMuted) {
-        setMicState(true); 
+        setMicState(true);
     }
 
     // --- KRİTİK DÜZELTME ---
