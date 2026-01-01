@@ -19,93 +19,102 @@ function createPeer(targetId, name, initiator) {
     const fileTransfer = require('../files/fileTransfer');
 
     try {
-        const peer = new SimplePeer({ 
-            initiator: initiator, 
-            stream: state.processedStream, 
-            trickle: false, 
-            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } 
+        const peer = new SimplePeer({
+            initiator: initiator,
+            stream: state.processedStream,
+            trickle: false,
+            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
         });
 
         // Signaling
-        peer.on('signal', signal => { 
-            socketService.send({ 
-                type: 'signal', 
-                targetId: targetId, 
-                signal: signal 
-            }); 
+        peer.on('signal', signal => {
+            socketService.send({
+                type: 'signal',
+                targetId: targetId,
+                signal: signal
+            });
         });
 
         // Connection Status
         peer.on('connect', () => {
             console.log(`🤝 P2P connected with ${targetId}`);
-            // Bağlantı tam olarak sağlandığında UI'ı "Live" yapıyoruz
+            // Bağlantı sağlandığında UI'ı "Live" olarak güncelle
             const userList = require('../ui/userList');
             userList.updateUserStatusUI(targetId, true);
+
+            // Re-send my status to ensure sync (mic/deafen)
+            // This helps if they connected AFTER I set my status
+            if (state.peers[targetId]) {
+                state.peers[targetId].send(JSON.stringify({ type: 'mic-status', isMuted: state.isMicMuted }));
+                state.peers[targetId].send(JSON.stringify({ type: 'deafen-status', isDeafened: state.isDeafened }));
+            }
         });
 
         // Media Stream
         peer.on('stream', stream => {
             console.log(`📡 ${targetId} kullanıcısından akış alındı.`);
-                
+
+            // Force UI update to "Live" immediately when stream is received
+            const userList = require('../ui/userList');
+            userList.updateUserStatusUI(targetId, true);
+
             if (stream.getVideoTracks().length > 0) {
                 // screen share stream
-                const userList = require('../ui/userList');
                 userList.addVideoElement(targetId, stream);
             } else {
                 // microphone audio stream
                 const visualizer = require('../audio/visualizer');
-                const userList = require('../ui/userList');
                 const audioEngine = require('../audio/audioEngine');
-                
+
                 // 1. Output audio to speaker
-                audioEngine.addAudioElement(targetId, stream); 
-                
+                audioEngine.addAudioElement(targetId, stream);
+
                 // 2. Create or update UI card
                 userList.addUserUI(targetId, state.userNames[targetId] || "Biri", true);
-                
+
                 // 3. Attach visualizer to stream
-                visualizer.attachVisualizer(stream, targetId); 
+                visualizer.attachVisualizer(stream, targetId);
             }
         });
 
         // Data Channel (Chat, File, Status)
-        peer.on('data', data => { 
+        peer.on('data', data => {
             try {
                 const strData = new TextDecoder("utf-8").decode(data);
                 const msg = JSON.parse(strData);
-                
+
                 // Route to service based on message type
                 if (msg.type === 'file-metadata' || msg.type === 'file-end' || msg.type === 'file-cancel') {
                     fileTransfer.handleIncomingFileData(targetId, data);
-                } 
-                else if (msg.type === 'chat') { 
-                    chatService.addMessageToUI(msg.sender, msg.text, 'received', msg.time); 
+                }
+                else if (msg.type === 'chat') {
+                    chatService.addMessageToUI(msg.sender, msg.text, 'received', msg.time);
                     audioEngine.playSystemSound('notification');
-                } 
-                else if (msg.type === 'mic-status') { 
-                    userList.updateMicStatusUI(targetId, msg.isMuted); 
-                } 
+                }
+                else if (msg.type === 'mic-status') {
+                    userList.updateMicStatusUI(targetId, msg.isMuted);
+                }
                 else if (msg.type === 'deafen-status') {
                     userList.updateDeafenStatusUI(targetId, msg.isDeafened);
                 }
-                else if (msg.type === 'sound-effect') { 
-                    audioEngine.playLocalSound(msg.effectName); 
-                } 
-                else if (msg.type === 'video-stopped') { 
-                    userList.removeVideoElement(targetId); 
+                else if (msg.type === 'sound-effect') {
+                    audioEngine.playLocalSound(msg.effectName);
                 }
-            } catch (e) { 
+                else if (msg.type === 'video-stopped') {
+                    userList.removeVideoElement(targetId);
+                }
+            } catch (e) {
                 // If not JSON, it is raw file data
-                fileTransfer.handleIncomingFileData(targetId, data); 
+                fileTransfer.handleIncomingFileData(targetId, data);
             }
         });
 
         peer.on('close', () => removePeer(targetId));
-        peer.on('error', err => { console.error(`Peer ${targetId} hatası:`, err); }); 
+        peer.on('error', err => { console.error(`Peer ${targetId} hatası:`, err); });
 
         state.peers[targetId] = peer;
-    } catch (e) { 
-        console.error("Peer oluşturma hatası:", e); 
+    } catch (e) {
+        console.error("Peer oluşturma hatası:", e);
     }
 }
 
@@ -115,21 +124,21 @@ function handleSignal(senderId, signal) {
         const userName = state.userNames[senderId] || "Bilinmeyen";
         createPeer(senderId, userName, false);
     }
-    if (state.peers[senderId]) { 
-        state.peers[senderId].signal(signal); 
+    if (state.peers[senderId]) {
+        state.peers[senderId].signal(signal);
     }
 }
 
 // Clears peer connection and related UI elements
 function removePeer(id) {
-    if (state.peers[id]) { 
-        state.peers[id].destroy(); 
-        delete state.peers[id]; 
+    if (state.peers[id]) {
+        state.peers[id].destroy();
+        delete state.peers[id];
     }
-    
+
     if (state.peerGainNodes[id]) delete state.peerGainNodes[id];
     if (state.activeRemoteStreams[id]) delete state.activeRemoteStreams[id];
-    
+
     const userList = require('../ui/userList');
     userList.removeUserUI(id);
 }
@@ -137,15 +146,15 @@ function removePeer(id) {
 // Sends data to all connected peers
 function broadcast(payload) {
     const jsonPayload = JSON.stringify(payload);
-    for (let id in state.peers) { 
-        try { 
+    for (let id in state.peers) {
+        try {
             // SADECE kanal açıksa gönder (Kritik hata düzeltmesi)
             if (state.peers[id] && state.peers[id].connected) {
-                state.peers[id].send(jsonPayload); 
+                state.peers[id].send(jsonPayload);
             }
-        } catch (e) { 
+        } catch (e) {
             console.error(`Broadcast error (${id}):`, e);
-        } 
+        }
     }
 }
 

@@ -3,7 +3,7 @@ const state = require('../state/appState');
 const dom = require('../ui/dom');
 
 let socket = null;
-let messageQueue = []; 
+let messageQueue = [];
 
 // --- CONNECTION LOGIC ---
 
@@ -32,7 +32,7 @@ function connect(url) {
             dom.btnConnect.disabled = false;
             dom.btnConnect.innerText = "Katıl";
         }
-        
+
         // Send queued messages
         if (messageQueue.length > 0) {
             while (messageQueue.length > 0) {
@@ -45,7 +45,7 @@ function connect(url) {
         try {
             const roomPreview = require('../ui/roomPreview');
             roomPreview.showTemporaryStatus("Sunucu bağlantısı aktif", "#2ecc71");
-        } catch (e) {}
+        } catch (e) { }
     };
 
     socket.onmessage = (event) => {
@@ -79,9 +79,9 @@ function handleMessage(data) {
     const chatService = require('../chat/chatService');
     const userList = require('../ui/userList');
     const audioEngine = require('../audio/audioEngine');
-    
+
     let roomPreview = null;
-    try { roomPreview = require('../ui/roomPreview'); } catch(e){}
+    try { roomPreview = require('../ui/roomPreview'); } catch (e) { }
 
     // Handle Message Types
     switch (data.type) {
@@ -89,23 +89,33 @@ function handleMessage(data) {
             alert("Sunucu Hatası: " + data.message);
             break;
 
-        case 'me': 
+        case 'me':
             state.myPeerId = data.id;
             break;
 
-        case 'room-users': 
+        case 'room-users':
         case 'user-list':
+            if (data.room && data.room !== state.currentRoom) {
+                return;
+            }
+
             state.allUsers = data.users;
             if (roomPreview) roomPreview.updateRoomPreview();
-    
+
             if (state.isConnected) {
-                data.users.forEach(u => { 
+                data.users.forEach(u => {
+                    if (u.room && u.room !== state.currentRoom) return;
+
                     if (u.id !== state.myPeerId) {
                         state.userNames[u.id] = u.name;
-                        // [GÜNCELLEME]: Avatar parametresini gönderiyoruz
-                        userList.addUserUI(u.id, u.name, false, u.avatar); 
-                
-                        if (shouldIInitiate(state.myPeerId, u.id)) {
+
+                        // [FIX]: Don't overwrite status if already connected!
+                        const isAlreadyConnected = state.peers[u.id] && state.peers[u.id].connected;
+
+                        // Only force to 'false' if NOT connected. If connected, keep it true (or update to true).
+                        userList.addUserUI(u.id, u.name, isAlreadyConnected, u.avatar);
+
+                        if (!state.peers[u.id] && shouldIInitiate(state.myPeerId, u.id)) {
                             peerService.createPeer(u.id, u.name, true);
                         }
                     }
@@ -115,18 +125,22 @@ function handleMessage(data) {
 
         case 'user-joined':
             if (data.id === state.myPeerId) return;
-            
+
+            if (data.room && data.room !== state.currentRoom) {
+                return;
+            }
+
             state.userNames[data.id] = data.name;
             userList.addUserUI(data.id, data.name, false, data.avatar);
             audioEngine.playSystemSound('join');
-            
-            // [FIX]: ID Comparison Initiation
-            if (shouldIInitiate(state.myPeerId, data.id)) {
+
+            if (!state.peers[data.id] && shouldIInitiate(state.myPeerId, data.id)) {
                 peerService.createPeer(data.id, data.name, true, data.avatar);
             }
             break;
 
         case 'user-left':
+            // Removing is safe even if different room (it just won't be found)
             audioEngine.playSystemSound('leave');
             peerService.removePeer(data.id);
             break;
@@ -170,18 +184,21 @@ function shouldIInitiate(myId, targetId) {
 
 // Join Room Request
 function joinRoom(name, room, avatar) {
-    const accessKey = state.configData && state.configData.ACCESS_KEY 
-                      ? state.configData.ACCESS_KEY.trim() 
-                      : null;
+    // [CLEANUP]: Ensure we start fresh when joining a room
+    cleanupAllPeers();
 
-    const payload = { 
-        type: 'join', 
+    const accessKey = state.configData && state.configData.ACCESS_KEY
+        ? state.configData.ACCESS_KEY.trim()
+        : null;
+
+    const payload = {
+        type: 'join',
         name: name,
         room: room,
         key: accessKey,
         avatar: avatar
     };
-    
+
     send(payload);
 }
 
@@ -206,8 +223,43 @@ function send(payload) {
     }
 }
 
+// Cleanup all peers (used when switching rooms or disconnecting)
+function cleanupAllPeers() {
+    const peerService = require('../webrtc/peerService');
+    const userList = require('../ui/userList');
+
+    // Remove all peers
+    for (let id in state.peers) {
+        peerService.removePeer(id);
+    }
+
+    // Clear State
+    state.peers = {};
+    state.peerGainNodes = {};
+    state.activeRemoteStreams = {};
+    state.userNames = {};
+
+    // Clear UI (except me)
+    if (userList && state.myPeerId) {
+        // We need to keep 'me', remove everyone else.
+        // userList.removeUserUI removes by ID.
+        // But we don't have list of all IDs nicely here except iterating state.userNames before clearing.
+        // Ideally we wipe the UI container and re-add 'me'.
+        const container = document.getElementById('userList');
+        if (container) {
+            const kids = Array.from(container.children);
+            kids.forEach(child => {
+                if (child.id !== 'user-me' && child.id !== `user-${state.myPeerId}`) {
+                    child.remove();
+                }
+            });
+        }
+    }
+}
+
 module.exports = {
     connect,
     joinRoom,
-    send
+    send,
+    cleanupAllPeers
 };
