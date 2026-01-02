@@ -165,8 +165,8 @@ dom.btnConnect.addEventListener('click', async () => {
         dom.btnSend.disabled = false;
         dom.btnShareScreen.disabled = false;
 
-        state.userNames["me"] = name + " (Ben)";
-        userList.addUserUI("me", state.userNames["me"], true, state.myAvatar);
+        state.userNames["me"] = name;
+        userList.addUserUI("me", name + " (Ben)", true, state.myAvatar);
 
         visualizer.attachVisualizer(state.processedStream, "me");
 

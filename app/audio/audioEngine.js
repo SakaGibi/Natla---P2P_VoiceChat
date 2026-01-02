@@ -193,7 +193,10 @@ function addAudioElement(id, stream) {
         const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
         const peerVol = (state.peerVolumes && state.peerVolumes[id]) ? (state.peerVolumes[id] / 100) : 1.0;
 
-        gainNode.gain.value = masterVol * peerVol;
+        // [FIX]: Check Deafen State!
+        // If I am deafened, the gain must be 0 regardless of sliders.
+        gainNode.gain.value = state.isDeafened ? 0 : (masterVol * peerVol);
+
         state.peerGainNodes[id] = gainNode;
 
         // Connect to Element

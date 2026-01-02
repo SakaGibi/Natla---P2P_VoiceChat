@@ -158,6 +158,10 @@ function handleMessage(data) {
             userList.updateMicStatusUI(data.senderId, data.isMuted);
             break;
 
+        case 'deafen-status':
+            userList.updateDeafenStatusUI(data.senderId, data.isDeafened);
+            break;
+
         case 'sound-effect':
             if (data.senderId !== state.myPeerId) {
                 audioEngine.playLocalSound(data.effectName);
@@ -237,14 +241,14 @@ function cleanupAllPeers() {
     state.peers = {};
     state.peerGainNodes = {};
     state.activeRemoteStreams = {};
+
+    // [FIX]: Preserve 'me' so we don't lose our own identity
+    const myName = state.userNames["me"];
     state.userNames = {};
+    if (myName) state.userNames["me"] = myName;
 
     // Clear UI (except me)
     if (userList && state.myPeerId) {
-        // We need to keep 'me', remove everyone else.
-        // userList.removeUserUI removes by ID.
-        // But we don't have list of all IDs nicely here except iterating state.userNames before clearing.
-        // Ideally we wipe the UI container and re-add 'me'.
         const container = document.getElementById('userList');
         if (container) {
             const kids = Array.from(container.children);

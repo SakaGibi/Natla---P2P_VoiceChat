@@ -37,11 +37,8 @@ function createPeer(targetId, name, initiator) {
 
         // Connection Status
         peer.on('connect', () => {
-            console.log(`🤝 P2P connected with ${targetId}`);
-            // Bağlantı sağlandığında UI'ı "Live" olarak güncelle
             const userList = require('../ui/userList');
             userList.updateUserStatusUI(targetId, true);
-
             // Re-send my status to ensure sync (mic/deafen)
             // This helps if they connected AFTER I set my status
             if (state.peers[targetId]) {
@@ -52,8 +49,6 @@ function createPeer(targetId, name, initiator) {
 
         // Media Stream
         peer.on('stream', stream => {
-            console.log(`📡 ${targetId} kullanıcısından akış alındı.`);
-
             // Force UI update to "Live" immediately when stream is received
             const userList = require('../ui/userList');
             userList.updateUserStatusUI(targetId, true);
