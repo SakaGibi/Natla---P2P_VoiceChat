@@ -11,6 +11,7 @@ const socketService = require(path.join(__dirname, 'socket/socketService'));
 const audioEngine = require(path.join(__dirname, 'audio/audioEngine'));
 const chatService = require(path.join(__dirname, 'chat/chatService'));
 const screenShare = require(path.join(__dirname, 'webrtc/screenShare'));
+const bandwidthManager = require(path.join(__dirname, 'webrtc/bandwidthManager'));
 const userList = require(path.join(__dirname, 'ui/userList'));
 const visualizer = require(path.join(__dirname, 'audio/visualizer'));
 const { initAutoUpdateUI } = require(path.join(__dirname, 'renderer/autoUpdateRenderer'));
@@ -130,7 +131,7 @@ window.onload = async () => {
         dom.avatarInput.onchange = (e) => {
             const file = e.target.files[0];
             if (file) {
-                if (file.size > 100 * 1024) return alert("Fotoğraf 100KB'dan büyük olamaz.");
+                if (file.size > 500 * 1024) return alert("Fotoğraf 500KB'dan büyük olamaz.");
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     const base64 = event.target.result;
@@ -142,6 +143,22 @@ window.onload = async () => {
             }
         };
     }
+
+    // 11. Network Stats & Bandwidth Manager
+    window.updateNetworkStats = (data) => {
+        const el = document.getElementById('networkStats');
+        if (el) {
+            const lossText = data.packetLoss !== undefined ? ` | Loss: %${data.packetLoss.toFixed(1)}` : '';
+            el.innerText = `Bitrate: ${(data.bitrate / 1000).toFixed(0)} kbps | Ping: ${data.rtt.toFixed(0)} ms${lossText} | Peers: ${data.peers}`;
+        }
+    };
+    bandwidthManager.startMonitoring();
+
+    // [OPTIMIZED]: Start watchdog removed.
+    // Run once at startup (delayed) to ensure context wakes up.
+    setTimeout(() => {
+        audioEngine.nudgeAllPeers();
+    }, 3000);
 };
 
 // --- JOIN BUTTON ---
@@ -175,7 +192,6 @@ dom.btnConnect.addEventListener('click', async () => {
         setTimeout(() => {
             audioEngine.setMicState(state.isMicMuted);
             if (state.isDeafened) {
-                const socketService = require('../socket/socketService');
                 socketService.send({ type: 'mic-status', isMuted: true });
             }
         }, 500);

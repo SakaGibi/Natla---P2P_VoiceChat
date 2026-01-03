@@ -111,6 +111,7 @@ async function initLocalStream(deviceId = null) {
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 deviceId: deviceId ? { exact: deviceId } : undefined,
+                channelCount: 1, // Force MONO
                 echoCancellation: true, // noise cancellation
                 noiseSuppression: true, // noise suppression
                 autoGainControl: true
@@ -314,6 +315,43 @@ function toggleDeafen() {
     } catch (e) { }
 }
 
+// --- AUDIO NUDGE (Manual Trigger for optimization) ---
+function nudgeAllPeers() {
+    console.log("[AudioEngine] Nudging peers...");
+
+    // 1. Check Output Context State
+    if (state.outputAudioContext && state.outputAudioContext.state === 'suspended') {
+        console.warn("[AudioEngine] Output Context suspended - Attempting resume...");
+        state.outputAudioContext.resume().catch(e => console.error("Resume failed:", e));
+    }
+
+    // 2. Nudge Peer Gain Nodes (Micro-adjustment)
+    if (state.peerGainNodes && state.outputAudioContext) {
+        const currentTime = state.outputAudioContext.currentTime;
+
+        for (const id in state.peerGainNodes) {
+            const gainNode = state.peerGainNodes[id];
+            if (!gainNode) continue;
+
+            try {
+                // Get current intended volume
+                const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
+                const peerVol = (state.peerVolumes && state.peerVolumes[id]) ? (state.peerVolumes[id] / 100) : 1.0;
+                const targetGain = state.isDeafened ? 0 : (masterVol * peerVol);
+
+                // Apply a micro-nudge: target -> target + 0.001 -> target
+                // This forces the audio thread to process this node (same as manual knob turn)
+                gainNode.gain.cancelScheduledValues(currentTime);
+                gainNode.gain.setValueAtTime(gainNode.gain.value, currentTime);
+                gainNode.gain.linearRampToValueAtTime(targetGain, currentTime + 0.1);
+
+            } catch (e) {
+                console.warn(`[AudioEngine] Failed to nudge node for ${id}`, e);
+            }
+        }
+    }
+}
+
 module.exports = {
     playSystemSound,
     playLocalSound,
@@ -322,5 +360,6 @@ module.exports = {
     removeAudioElement,
     setAudioOutputDevice,
     setMicState,
-    toggleDeafen
+    toggleDeafen,
+    nudgeAllPeers
 };
