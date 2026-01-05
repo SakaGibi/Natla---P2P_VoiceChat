@@ -4,9 +4,16 @@ function initAutoUpdateUI({
     btnCheckUpdate,
     btnInstallUpdate,
     updateStatus,
-    btnConnect
+    btnConnect,
+    updateNotification,
+    btnDismissUpdate,
+    btnSettings,
+    passwordModal
 }) {
     let currentVersion = "Sürüm yükleniyor...";
+
+    // Normalize display to none initially just in case
+    if (updateNotification) updateNotification.style.display = 'none';
 
     // Get Initial Version
     ipcRenderer.invoke('get-app-version').then(v => {
@@ -55,6 +62,19 @@ function initAutoUpdateUI({
         ipcRenderer.send('install-update');
     });
 
+    // Dismiss Notification
+    if (btnDismissUpdate && updateNotification) {
+        btnDismissUpdate.addEventListener('click', () => {
+            updateNotification.style.display = 'none';
+        });
+    }
+
+    if (btnSettings && updateNotification) {
+        btnSettings.addEventListener('click', () => {
+            updateNotification.style.display = 'none';
+        });
+    }
+
     // --- IPC LISTENERS ---
 
     // Update Available
@@ -63,6 +83,11 @@ function initAutoUpdateUI({
         updateStatus.style.color = "#3498db";
         btnCheckUpdate.style.display = 'none';
         btnDownloadUpdate.style.display = 'block';
+
+        // Show notification bubble
+        if (updateNotification) {
+            updateNotification.style.display = 'block';
+        }
     });
 
     // Update Not Available

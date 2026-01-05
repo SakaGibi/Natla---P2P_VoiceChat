@@ -1,5 +1,5 @@
 // main.js - Electron Main Process
-const { app, BrowserWindow, session, desktopCapturer, ipcMain } = require('electron'); 
+const { app, BrowserWindow, session, desktopCapturer, ipcMain } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
@@ -14,14 +14,14 @@ autoUpdater.forceDevUpdateConfig = true;
 autoUpdater.allowDowngrade = true;
 let mainWindow;
 
-function createWindow () {
+function createWindow() {
   mainWindow = new BrowserWindow({
     width: 670,
     height: 800,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true 
+      enableRemoteModule: true
     },
     icon: path.join(__dirname, 'assets/gazmaliyim.ico')
   });
@@ -42,10 +42,10 @@ function createWindow () {
 // IPC Logic: Requests from Renderer
 ipcMain.on('check-for-update', () => {
   // if (isDev) {
-    // Return immediately in dev mode to prevent UI hang
-    //mainWindow.webContents.send('update-not-available');
+  // Return immediately in dev mode to prevent UI hang
+  //mainWindow.webContents.send('update-not-available');
   // } else {
-    autoUpdater.checkForUpdates();
+  autoUpdater.checkForUpdates();
   // }
 });
 
@@ -69,7 +69,8 @@ autoUpdater.on('checking-for-update', () => {
 
 autoUpdater.on('update-available', (info) => {
   log.info('Güncelleme bulundu!');
-  mainWindow.webContents.send('update-available');
+  // Send version info
+  mainWindow.webContents.send('update-available', info.version);
 });
 
 autoUpdater.on('update-not-available', (info) => {
@@ -88,12 +89,12 @@ autoUpdater.on('download-progress', (progressObj) => {
 
 autoUpdater.on('update-available', (info) => {
   log.info('Güncelleme bulundu: ' + info.version);
-  mainWindow.webContents.send('update-available', info.version); 
+  mainWindow.webContents.send('update-available', info.version);
 });
 
 autoUpdater.on('update-downloaded', (info) => {
   log.info('İndirme tamamlandı.');
-  mainWindow.webContents.send('update-ready'); 
+  mainWindow.webContents.send('update-ready');
 });
 
 app.whenReady().then(() => {
@@ -101,6 +102,10 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates();
+  }, 3000);
 });
 
 app.on('window-all-closed', () => {

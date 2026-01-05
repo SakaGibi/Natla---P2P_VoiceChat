@@ -19,7 +19,16 @@
             <div class="profile-section">
                 <h1>Natla</h1>
             </div>
-            <button id="btnSettings" title="Sunucu Ayarları">⚙️</button>
+            <div style="position: relative;">
+                <button id="btnSettings" title="Sunucu Ayarları">⚙️</button>
+                <div id="updateNotification" class="update-notification" style="display: none;">
+                    <div class="notch"></div>
+                    <div class="content">
+                        <span>Yeni sürüm var!</span>
+                        <button id="btnDismissUpdate">Tamam</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Settings Modal -->

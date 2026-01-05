@@ -117,6 +117,74 @@ body.light-theme #btnSettings {
     color: #333;
 }
 
+/* Update Notification Bubble */
+.update-notification {
+    position: absolute;
+    top: 45px;
+    right: 0;
+    width: 200px;
+    background: #0078d4;
+    /* Microsoft Blue or similar alerting color */
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    color: white;
+}
+
+.update-notification .notch {
+    position: absolute;
+    top: -8px;
+    right: 14px;
+    /* Align with setting button center roughly */
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid #0078d4;
+}
+
+.update-notification .content {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.update-notification span {
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.update-notification button {
+    background: white;
+    color: #0078d4;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    width: 100%;
+}
+
+.update-notification button:hover {
+    background: #f0f0f0;
+}
+
+@keyframes popIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
 /* Status Bar & Name Input */
 .status-name-row {
     display: flex;
@@ -365,8 +433,10 @@ body.light-theme #btnSettings {
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
     /* Ensure text doesn't overflow */
     overflow: hidden;
-    word-wrap: break-word; /* Allow wrapping */
-    white-space: normal; /* Allow wrapping */
+    word-wrap: break-word;
+    /* Allow wrapping */
+    white-space: normal;
+    /* Allow wrapping */
     line-height: 1.1;
 }
 

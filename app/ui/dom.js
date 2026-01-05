@@ -49,6 +49,10 @@ const dom = {
     btnCheckUpdate: document.getElementById('btnCheckUpdate'),
     btnInstallUpdate: document.getElementById('btnInstallUpdate'),
 
+    // Update Notification Bubble
+    updateNotification: document.getElementById('updateNotification'),
+    btnDismissUpdate: document.getElementById('btnDismissUpdate'),
+
     // Screen Share Modal
     streamModal: document.getElementById('streamModal'),
     btnCloseStream: document.getElementById('btnCloseStream'),

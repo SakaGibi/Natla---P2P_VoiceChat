@@ -66,7 +66,11 @@ window.onload = async () => {
         btnCheckUpdate: dom.btnCheckUpdate,
         btnInstallUpdate: dom.btnInstallUpdate,
         updateStatus: dom.updateStatus,
-        btnConnect: dom.btnConnect
+        btnConnect: dom.btnConnect,
+        updateNotification: dom.updateNotification,
+        btnDismissUpdate: dom.btnDismissUpdate,
+        btnSettings: dom.btnSettings, // We need this to attach listener or logic if needed, although autoUpdateRenderer logic might handle it independent of click
+        passwordModal: dom.passwordModal // To check if settings are open
     });
 
     // 7. Master Volume Control
