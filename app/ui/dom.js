@@ -13,6 +13,7 @@ const dom = {
 
     // Control Buttons
     btnToggleMic: document.getElementById('btnToggleMic'),
+    btnToggleCam: document.getElementById('btnToggleCam'),
     btnToggleSound: document.getElementById('btnToggleSound'),
     btnDisconnect: document.getElementById('btnDisconnect'),
     btnShareScreen: document.getElementById('btnShareScreen'),

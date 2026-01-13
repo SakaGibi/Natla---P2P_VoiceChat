@@ -257,88 +257,67 @@ function addVideoElement(id, stream) {
     }
 }
 
-//Removes video button and closes modal if active.
+// Removes video from the shared window
 function removeVideoElement(id) {
     delete state.activeRemoteStreams[id];
+
+    // Remove "WATCH" button
     const card = document.getElementById(`user-${id}`);
     if (card) {
         const btn = card.querySelector('.stream-icon-btn');
         if (btn) btn.remove();
     }
 
-    const streamerLabel = document.getElementById('streamerName');
-
-    // Close the popup window if it exists
-    if (state.activeStreamWindows && state.activeStreamWindows[id]) {
+    // Remove from shared window if open
+    if (state.videoWindow && !state.videoWindow.closed) {
         try {
-            state.activeStreamWindows[id].close();
+            state.videoWindow.api.removeStream(id);
         } catch (e) {
-            console.error("Pencere kapatılamadı:", e);
+            console.error("Video penceresi güncellenemedi:", e);
         }
-        delete state.activeStreamWindows[id];
-    }
-
-    if (dom.streamModal && dom.streamModal.style.display !== 'none' &&
-        streamerLabel && streamerLabel.getAttribute('data-id') === id) {
-
-        dom.streamModal.style.display = 'none';
-        if (dom.largeVideoPlayer) dom.largeVideoPlayer.srcObject = null;
     }
 }
 
 //Opens the stream watch window (Modal).
 //Opens the stream watch window (Popup).
+// Opens (or focuses) the shared stream window and adds the user's stream
 function openStreamModal(id) {
-    if (!state.activeRemoteStreams[id]) return alert("No active stream found.");
-
-    // Check if window is already open
-    if (state.activeStreamWindows && state.activeStreamWindows[id] && !state.activeStreamWindows[id].closed) {
-        state.activeStreamWindows[id].focus();
-        return;
-    }
+    const stream = state.activeRemoteStreams[id];
+    if (!stream) return alert("Akış bulunamadı.");
 
     const userName = state.userNames[id] || 'Kullanıcı';
-    const width = 1200;
-    const height = 800;
 
-    // Open new popup window
-    // Note: We use a relative path. Since index.html is in 'app/', video_player.html should also be in 'app/'
-    const streamWindow = window.open('video_player.html', `NatlaLive-${id}`, `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no`);
+    // 1. Check if shared window exists and is open
+    if (!state.videoWindow || state.videoWindow.closed) {
+        // Open new window
+        const width = 1000;
+        const height = 700;
+        state.videoWindow = window.open('video_player.html', 'NatlaLive', `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no`);
 
-    if (!streamWindow) {
-        return alert("Pencere açılamadı! Lütfen izin verin.");
-    }
+        if (!state.videoWindow) return alert("Pencere açılamadı! Lütfen izin verin.");
 
-    // Save reference
-    if (!state.activeStreamWindows) state.activeStreamWindows = {};
-    state.activeStreamWindows[id] = streamWindow;
+        // Wait for load then add stream
+        state.videoWindow.onload = () => {
+            state.videoWindow.api.addStream(id, userName, stream);
 
-    // Inject stream once loaded
-    streamWindow.onload = () => {
-        const vid = streamWindow.document.getElementById('remoteVideo');
-        const title = streamWindow.document.getElementById('pageTitle');
-
-        if (vid) {
-            vid.srcObject = state.activeRemoteStreams[id];
-            // Ensure audio output device preference is respected if possible, 
-            // though Electron popup might use default device.
-            // .setSinkId is not always supported in all contexts easily without secure context, 
-            // but Electron usually supports it.
-            // if (vid.setSinkId && localStorage.getItem('selectedSpeaker')) {
-            //     vid.setSinkId(localStorage.getItem('selectedSpeaker')).catch(e => console.error(e));
-            // }
-        }
-
-        if (title) {
-            title.innerText = `${userName} - Ekran Paylaşımı`;
-            streamWindow.document.title = `${userName} - Canlı`;
-        }
-
-        // Window close handler to clean up reference
-        streamWindow.onbeforeunload = () => {
-            delete state.activeStreamWindows[id];
+            // Cleanup on close
+            state.videoWindow.onbeforeunload = () => {
+                state.videoWindow = null;
+            };
         };
-    };
+    } else {
+        // Window already open, just add stream
+        state.videoWindow.focus();
+        // Just in case it's not fully loaded yet (race condition), check api
+        if (state.videoWindow.api) {
+            state.videoWindow.api.addStream(id, userName, stream);
+        } else {
+            // Should be rare if window was already open
+            state.videoWindow.onload = () => {
+                state.videoWindow.api.addStream(id, userName, stream);
+            };
+        }
+    }
 }
 
 // Removes the user card and related audio elements.

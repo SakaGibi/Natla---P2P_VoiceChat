@@ -629,11 +629,48 @@ body.light-theme #btnSettings {
 }
 
 /* Share Screen Button */
+/* Action Buttons Group */
+.user-list-actions {
+    display: flex;
+    gap: 0;
+}
+
+#btnToggleCam {
+    background-color: #0288d1;
+    color: white;
+    border: none;
+    border-radius: 4px 0 0 4px;
+    padding: 4px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    border-right: 1px solid rgba(0, 0, 0, 0.5);
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#btnToggleCam:hover:not(:disabled) {
+    background-color: #039be5;
+}
+
+#btnToggleCam.active-cam {
+    background-color: #e74c3c !important;
+}
+
+#btnToggleCam:disabled {
+    background-color: #555;
+    color: #aaa;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Share Screen Button */
 #btnShareScreen {
     background-color: #0288d1;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 0 4px 4px 0;
     padding: 4px 10px;
     font-size: 13px;
     font-weight: 600;
@@ -892,9 +929,7 @@ body.light-theme #btnSettings {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
-/* =========================================
-   11. MARQUEE USERNAME
-   ========================================= */
+
 .user-name-container {
     max-width: 110px;
     /* Limit the visual width */
@@ -904,7 +939,6 @@ body.light-theme #btnSettings {
 }
 
 .user-name-container.should-scroll {
-    /* optional: mask to fade edges */
     -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
     mask-image: linear-gradient(to right, black 85%, transparent 100%);
 }
@@ -913,14 +947,9 @@ body.light-theme #btnSettings {
     display: inline-block;
 }
 
-/* Apply animation only when the class 'should-scroll' is present (added via JS) 
-   and on hover (or always, based on preference. User implied 'music apps', which often loop always or hover).
-   I'll do Hover for now to be safe, or Always if desired. 
-   Let's do Hover as it is less distracting. */
 .user-name-container.should-scroll:hover .user-name-text {
     animation: marquee-scroll var(--scroll-duration, 4s) linear infinite;
     padding-right: 20px;
-    /* Space for loop visual if we were duplicate, but here it helps separation */
 }
 
 @keyframes marquee-scroll {
@@ -934,7 +963,6 @@ body.light-theme #btnSettings {
 }
 
 .name-btn-wrapper {
-    /* Ensures the button stays next to the name even with the flex container */
     max-width: 100%;
     min-width: 0;
 }

@@ -12,6 +12,7 @@ const audioEngine = require(path.join(__dirname, 'audio/audioEngine'));
 const chatService = require(path.join(__dirname, 'chat/chatService'));
 const screenShare = require(path.join(__dirname, 'webrtc/screenShare'));
 const bandwidthManager = require(path.join(__dirname, 'webrtc/bandwidthManager'));
+const cameraService = require(path.join(__dirname, 'webrtc/cameraService'));
 const userList = require(path.join(__dirname, 'ui/userList'));
 const visualizer = require(path.join(__dirname, 'audio/visualizer'));
 const { initAutoUpdateUI } = require(path.join(__dirname, 'renderer/autoUpdateRenderer'));
@@ -185,6 +186,7 @@ dom.btnConnect.addEventListener('click', async () => {
         dom.msgInput.disabled = false;
         dom.btnSend.disabled = false;
         dom.btnShareScreen.disabled = false;
+        dom.btnToggleCam.disabled = false;
 
         state.userNames["me"] = name;
         userList.addUserUI("me", name + " (Ben)", true, state.myAvatar);
@@ -221,6 +223,11 @@ dom.btnToggleSound.addEventListener('click', () => {
 dom.btnShareScreen.addEventListener('click', () => {
     if (!state.isSharingScreen) screenShare.start();
     else screenShare.stop();
+});
+
+dom.btnToggleCam.addEventListener('click', () => {
+    if (!state.isCameraOn) cameraService.start();
+    else cameraService.stop();
 });
 
 dom.btnSend.addEventListener('click', () => chatService.sendChat());

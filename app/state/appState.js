@@ -15,16 +15,18 @@ module.exports = {
     // WebRTC & Peer Management
     peers: {}, // Active P2P connections
     activeRemoteStreams: {}, // Remote screen shares
-    activeStreamWindows: {}, // Active screen share popup windows
+    videoWindow: null, // Shared popup window for all streams
 
     // Media States
     isMicMuted: false,
     isDeafened: false,
     isSharingScreen: false,
+    isCameraOn: false,
 
     // Audio Streams & Web Audio API Objects
     localStream: null, // Raw microphone audio
     screenStream: null, // Screen share stream
+    cameraStream: null, // Camera stream
     processedStream: null, // Processed audio (gain applied)
 
     audioContext: null, // Input audio processing context

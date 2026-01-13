@@ -3,12 +3,12 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Natla - Ekran Paylaşımı</title>
+    <title>Kameralar</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #000;
+            background-color: #1a1a1a;
             color: white;
             display: flex;
             flex-direction: column;
@@ -18,55 +18,134 @@
         }
 
         #header {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 10;
+            padding: 10px 20px;
+            background: #2b2b2b;
+            border-bottom: 1px solid #444;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        body:hover #header {
-            opacity: 1;
         }
 
         h2 {
             margin: 0;
-            padding-left: 10px;
             font-size: 16px;
-            font-weight: normal;
-            text-shadow: 1px 1px 2px black;
+            color: #ddd;
         }
 
-        #video-container {
+        /* Grid Container for Multiple Streams */
+        #video-grid {
             flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            align-content: center;
         }
 
-        video {
+        /* Single Video Wrapper */
+        .video-wrapper {
+            background: black;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            aspect-ratio: 16/9;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-wrapper video {
             width: 100%;
             height: 100%;
             object-fit: contain;
-            /* Keeps aspect ratio */
+            transform: scaleX(-1);
+            /* Mirror effect */
+        }
+
+        .video-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+
+        /* Empty State */
+        .empty-state {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #555;
+            font-size: 18px;
         }
     </style>
 </head>
 
 <body>
     <div id="header">
-        <h2 id="pageTitle">Ekran Paylaşımı</h2>
+        <h2 id="pageTitle">Natla Yayınları</h2>
     </div>
-    <div id="video-container">
-        <video id="remoteVideo" autoplay playsinline controls></video>
+    <div id="video-grid">
+        <div class="empty-state">Yayın bekleniyor...</div>
     </div>
+
+    <!-- Script to handle dynamic streams -->
+    <script>
+        const grid = document.getElementById('video-grid');
+        const emptyState = document.querySelector('.empty-state');
+        const streams = {}; // Store active streams
+
+        // API exposed to parent window
+        window.api = {
+            addStream: (id, name, stream) => {
+                if (streams[id]) return; // Already exists
+
+                // Remove empty state if present
+                if (emptyState && emptyState.parentElement) {
+                    emptyState.remove();
+                }
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'video-wrapper';
+                wrapper.id = `wrapper-${id}`;
+
+                const video = document.createElement('video');
+                video.autoplay = true;
+                video.playsInline = true;
+                video.srcObject = stream;
+
+                // Add name label
+                const label = document.createElement('div');
+                label.className = 'video-label';
+                label.innerText = name;
+
+                wrapper.appendChild(video);
+                wrapper.appendChild(label);
+                grid.appendChild(wrapper);
+
+                streams[id] = wrapper;
+            },
+            removeStream: (id) => {
+                if (streams[id]) {
+                    streams[id].remove();
+                    delete streams[id];
+                }
+
+                if (Object.keys(streams).length === 0) {
+                    grid.appendChild(emptyState);
+                }
+            },
+            setTitle: (text) => {
+                document.getElementById('pageTitle').innerText = text;
+            }
+        };
+    </script>
 </body>
 
 </html>
