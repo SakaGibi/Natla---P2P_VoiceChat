@@ -74,6 +74,43 @@
                     </div>
                 </div>
 
+                <!-- Audio Settings Section -->
+                <div id="audioSettingsModal" style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+                    <label style="color: #bbb; font-size: 12px; display:block; margin-bottom:12px;">Ses Ayarları</label>
+
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Input Selection -->
+                        <div class="slider-group" style="display: flex; align-items: center; gap: 10px;">
+                            <label style="color: #bbb; font-size: 11px; width: 80px;">🎤 Giriş:</label>
+                            <select id="micSelect" class="device-select" style="flex: 1;">
+                                <option value="">Varsayılan Mikrofon</option>
+                            </select>
+                        </div>
+
+                        <!-- Output Selection -->
+                        <div class="slider-group" style="display: flex; align-items: center; gap: 10px;">
+                            <label style="color: #bbb; font-size: 11px; width: 80px;">🎧 Çıkış:</label>
+                            <select id="speakerSelect" class="device-select" style="flex: 1;">
+                                <option value="">Varsayılan Hoparlör</option>
+                            </select>
+                        </div>
+
+                        <!-- Mic Volume -->
+                        <div class="slider-group" style="display: flex; align-items: center; gap: 10px;">
+                            <label style="color: #bbb; font-size: 11px; width: 80px;">🎤 Mic Ses:</label>
+                            <input type="range" id="micVolume" min="0" max="300" value="100" style="flex: 1;">
+                            <span id="micVal" class="slider-val" style="width: 40px; text-align: right;">100%</span>
+                        </div>
+
+                        <!-- Master Volume -->
+                        <div class="slider-group" style="display: flex; align-items: center; gap: 10px;">
+                            <label style="color: #bbb; font-size: 11px; width: 80px;">🎧 Genel Ses:</label>
+                            <input type="range" id="masterVolume" min="0" max="300" value="100" style="flex: 1;">
+                            <span id="masterVal" class="slider-val" style="width: 40px; text-align: right;">100%</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Update Section -->
                 <div id="updateSection" style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
                     <label style="color: #bbb; font-size: 12px; display:block; margin-bottom:10px;">Uygulama
@@ -168,33 +205,7 @@
             </div>
         </div>
 
-        <!-- Audio Settings Panel -->
-        <div id="settingsPanel">
-            <!-- Input/Output Selection -->
-            <div class="slider-group">
-                <label>🎤 Giriş:</label>
-                <select id="micSelect" class="device-select">
-                    <option value="">Varsayılan Mikrofon</option>
-                </select>
-            </div>
-            <div class="slider-group">
-                <label>🎧 Çıkış:</label>
-                <select id="speakerSelect" class="device-select">
-                    <option value="">Varsayılan Hoparlör</option>
-                </select>
-            </div>
-            <!-- Volume Controls -->
-            <div class="slider-group">
-                <label>🎤 Mic Ses:</label>
-                <input type="range" id="micVolume" min="0" max="300" value="100">
-                <span id="micVal" class="slider-val">100%</span>
-            </div>
-            <div class="slider-group">
-                <label>🎧 Genel Ses:</label>
-                <input type="range" id="masterVolume" min="0" max="300" value="100">
-                <span id="masterVal" class="slider-val">100%</span>
-            </div>
-        </div>
+
 
         <!-- Users & Soundpad Section -->
         <div id="users">
