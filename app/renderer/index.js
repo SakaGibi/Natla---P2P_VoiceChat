@@ -153,8 +153,14 @@ window.onload = async () => {
     window.updateNetworkStats = (data) => {
         const el = document.getElementById('networkStats');
         if (el) {
-            const lossText = data.packetLoss !== undefined ? ` | Loss: %${data.packetLoss.toFixed(1)}` : '';
-            el.innerText = `Bitrate: ${(data.bitrate / 1000).toFixed(0)} kbps | Ping: ${data.rtt.toFixed(0)} ms${lossText} | Peers: ${data.peers}`;
+            const lossText = data.packetLoss !== undefined ? `Loss: %${data.packetLoss.toFixed(1)}` : 'Loss: %0.0';
+            // Vertical format with HTML break tags
+            el.innerHTML = `
+                <div>Bitrate: ${(data.bitrate / 1000).toFixed(0)} kbps</div>
+                <div>Ping: ${data.rtt.toFixed(0)} ms</div>
+                <div>${lossText}</div>
+                <div>Peers: ${data.peers}</div>
+            `;
         }
     };
     bandwidthManager.startMonitoring();
