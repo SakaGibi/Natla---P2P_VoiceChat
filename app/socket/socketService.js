@@ -168,9 +168,7 @@ function handleMessage(data) {
             }
             break;
 
-        case 'video-stopped':
-            userList.removeVideoElement(data.senderId);
-            break;
+        // case 'video-stopped': REMOVED - Stack handled by track.onended
 
         case 'poke':
             console.log("Poke received:", data);

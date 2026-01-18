@@ -36,6 +36,11 @@ async function start() {
                 console.error(`Peer ${id} kamera akışı ekleme hatası:`, err);
             }
         }
+
+        // Add to local video window if open
+        if (state.videoWindow && !state.videoWindow.closed && state.videoWindow.api) {
+            state.videoWindow.api.addStream('me-cam', 'Ben (Kamera)', state.cameraStream);
+        }
     } catch (err) {
         console.error("Kamera başlatılamadı:", err);
         // Fallback to fake camera for testing if requested or error
@@ -101,17 +106,18 @@ function stop() {
     // Stop stream tracks
     state.cameraStream.getTracks().forEach(track => track.stop());
 
-    // Remove stream from peers and send notification
+    // Remove from peers (Track ended event will handle the rest on their side)
     for (let id in state.peers) {
         try {
             state.peers[id].removeStream(state.cameraStream);
-            state.peers[id].send(JSON.stringify({
-                type: 'video-stopped',
-                senderId: state.myPeerId
-            }));
         } catch (err) {
             console.error(`Peer ${id} kamera akışı kaldırma hatası:`, err);
         }
+    }
+
+    // Remove from local video window if open
+    if (state.videoWindow && !state.videoWindow.closed && state.videoWindow.api) {
+        state.videoWindow.api.removeStream('me-cam');
     }
 
     // Clean up state and UI

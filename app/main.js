@@ -1,5 +1,5 @@
 // main.js - Electron Main Process
-const { app, BrowserWindow, session, desktopCapturer, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, session, desktopCapturer, ipcMain, globalShortcut, Menu } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
@@ -33,8 +33,16 @@ function createWindow() {
     icon: path.join(__dirname, 'assets/gazmaliyim.ico')
   });
 
+  // Menu.setApplicationMenu(null); // Removed to restore shortcuts
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile('index.html');
+
+  // Global handler for ALL windows (including popups)
+  app.on('browser-window-created', (e, win) => {
+    win.setMenuBarVisibility(false);
+    win.setAutoHideMenuBar(true);
+    win.setIcon(path.join(__dirname, 'assets/gazmaliyim.ico'));
+  });
 
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {

@@ -59,7 +59,7 @@ function createPeer(targetId, name, initiator) {
             userList.updateUserStatusUI(targetId, true);
 
             if (stream.getVideoTracks().length > 0) {
-                // screen share stream
+                // video stream (cam or screen)
                 userList.addVideoElement(targetId, stream);
             } else {
                 // microphone audio stream
@@ -100,9 +100,7 @@ function createPeer(targetId, name, initiator) {
                 else if (msg.type === 'sound-effect') {
                     audioEngine.playLocalSound(msg.effectName);
                 }
-                else if (msg.type === 'video-stopped') {
-                    userList.removeVideoElement(targetId);
-                }
+                // else if (msg.type === 'video-stopped') { REMOVED }
             } catch (e) {
                 // If not JSON, it is raw file data
                 fileTransfer.handleIncomingFileData(targetId, data);

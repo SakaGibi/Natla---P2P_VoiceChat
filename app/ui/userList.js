@@ -98,12 +98,6 @@ function addUserUI(id, name, isConnected, avatar = null) {
         }
     }
 
-    // SCROLL CHECK: Check if name is too long
-    // We must wait for render or text availability. 
-    // Since we appended 'el' to DOM before setting innerHTML (wait, no, previous code did innerHTML THEN append? No.)
-    // Let's check logic:
-    // Code says: el = document.createElement... dom.userList.appendChild(el)... el.innerHTML = ...
-    // So it IS in the DOM. We can check immediately.
     setTimeout(() => {
         const nameContainer = el.querySelector('.user-name-container');
         const nameText = el.querySelector('.user-name-text');
@@ -217,16 +211,38 @@ function updatePeerVolume(id, value) {
 // Expose to window for HTML access
 window.updatePeerVolume = updatePeerVolume;
 
-//Adds 'WATCH' button to user card when screen sharing starts.
+// Adds 'WATCH' button to user card when a stream starts.
 function addVideoElement(id, stream) {
-    state.activeRemoteStreams[id] = stream;
-    const card = document.getElementById(`user-${id}`);
+    // Ensure array exists
+    if (!state.activeRemoteStreams[id]) {
+        state.activeRemoteStreams[id] = [];
+    }
+    // Avoid duplicates
+    if (state.activeRemoteStreams[id].includes(stream)) return;
 
+    state.activeRemoteStreams[id].push(stream);
+
+    // Add cleanup listeners (Robust)
+    const cleanup = () => removeVideoElement(id, stream);
+
+    // 1. Track ended
+    if (stream.getVideoTracks().length > 0) {
+        stream.getVideoTracks()[0].addEventListener('ended', cleanup);
+    }
+
+    // 2. Stream inactive
+    stream.addEventListener('inactive', cleanup);
+
+    // 3. Track removed
+    stream.addEventListener('removetrack', cleanup);
+
+    // Add Watch Button if not exists
+    const card = document.getElementById(`user-${id}`);
     if (card && !card.querySelector('.stream-icon-btn')) {
         const btn = document.createElement('button');
         btn.className = 'stream-icon-btn';
-        btn.innerHTML = '🖥️ WATCH';
-        btn.onclick = () => openStreamModal(id);
+        btn.innerHTML = '🖥️ İZLE';
+        btn.onclick = () => openVideoGallery(); // Opens ALL streams
 
         const header = card.querySelector('.user-header');
         const nameEl = header ? header.querySelector('.user-name') : null;
@@ -238,87 +254,97 @@ function addVideoElement(id, stream) {
                 wrapper.className = 'name-btn-wrapper';
                 wrapper.style.display = 'flex';
                 wrapper.style.alignItems = 'center';
-
                 nameEl.parentNode.insertBefore(wrapper, nameEl);
                 wrapper.appendChild(nameEl);
             }
-
             btn.style.marginLeft = '8px';
             btn.style.marginRight = '0';
-
             wrapper.appendChild(btn);
         } else {
             card.appendChild(btn);
         }
     }
 
-    if (stream.getVideoTracks().length > 0) {
-        stream.getVideoTracks()[0].onended = () => removeVideoElement(id);
+    // If Window is Open, Add Stream Immediately
+    if (state.videoWindow && !state.videoWindow.closed && state.videoWindow.api) {
+        const userName = state.userNames[id] || 'Kullanıcı';
+        // Generate unique ID for this specific stream instance
+        const streamId = id + '-' + stream.id;
+        state.videoWindow.api.addStream(streamId, userName, stream);
     }
 }
 
-// Removes video from the shared window
-function removeVideoElement(id) {
-    delete state.activeRemoteStreams[id];
+// Removes a specific stream
+function removeVideoElement(id, stream) {
+    if (!state.activeRemoteStreams[id]) return;
 
-    // Remove "WATCH" button
-    const card = document.getElementById(`user-${id}`);
-    if (card) {
-        const btn = card.querySelector('.stream-icon-btn');
-        if (btn) btn.remove();
+    // Remove from array
+    state.activeRemoteStreams[id] = state.activeRemoteStreams[id].filter(s => s !== stream);
+
+    // If Window Open, Remove Stream
+    if (state.videoWindow && !state.videoWindow.closed && state.videoWindow.api) {
+        const streamId = id + '-' + stream.id;
+        state.videoWindow.api.removeStream(streamId);
     }
 
-    // Remove from shared window if open
-    if (state.videoWindow && !state.videoWindow.closed) {
-        try {
-            state.videoWindow.api.removeStream(id);
-        } catch (e) {
-            console.error("Video penceresi güncellenemedi:", e);
+    // If no streams left for this user, remove Watch Button
+    if (state.activeRemoteStreams[id].length === 0) {
+        delete state.activeRemoteStreams[id];
+        const card = document.getElementById(`user-${id}`);
+        if (card) {
+            const btn = card.querySelector('.stream-icon-btn');
+            if (btn) btn.remove();
         }
     }
 }
 
-//Opens the stream watch window (Modal).
-//Opens the stream watch window (Popup).
-// Opens (or focuses) the shared stream window and adds the user's stream
-function openStreamModal(id) {
-    const stream = state.activeRemoteStreams[id];
-    if (!stream) return alert("Akış bulunamadı.");
-
-    const userName = state.userNames[id] || 'Kullanıcı';
-
-    // 1. Check if shared window exists and is open
+// Opens the unified video gallery
+function openVideoGallery() {
+    // 1. Open Window if not open
     if (!state.videoWindow || state.videoWindow.closed) {
-        // Open new window
         const width = 1000;
         const height = 700;
         state.videoWindow = window.open('video_player.html', 'NatlaLive', `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no`);
 
         if (!state.videoWindow) return alert("Pencere açılamadı! Lütfen izin verin.");
 
-        // Wait for load then add stream
         state.videoWindow.onload = () => {
-            state.videoWindow.api.addStream(id, userName, stream);
+            addAllStreamsToWindow();
 
-            // Cleanup on close
             state.videoWindow.onbeforeunload = () => {
                 state.videoWindow = null;
             };
         };
     } else {
-        // Window already open, just add stream
         state.videoWindow.focus();
-        // Just in case it's not fully loaded yet (race condition), check api
-        if (state.videoWindow.api) {
-            state.videoWindow.api.addStream(id, userName, stream);
-        } else {
-            // Should be rare if window was already open
-            state.videoWindow.onload = () => {
-                state.videoWindow.api.addStream(id, userName, stream);
-            };
-        }
+        addAllStreamsToWindow();
     }
 }
+
+// Helper to push all active streams + Self streams to window
+function addAllStreamsToWindow() {
+    if (!state.videoWindow || !state.videoWindow.api) return;
+
+    // 1. Local Streams (Self View)
+    if (state.cameraStream) {
+        state.videoWindow.api.addStream('me-cam', 'Ben (Kamera)', state.cameraStream);
+    }
+    if (state.screenStream) {
+        state.videoWindow.api.addStream('me-screen', 'Ben (Ekran)', state.screenStream);
+    }
+
+    // 2. Remote Streams
+    for (let userId in state.activeRemoteStreams) {
+        const streams = state.activeRemoteStreams[userId];
+        const userName = state.userNames[userId] || 'Kullanıcı';
+
+        streams.forEach(stream => {
+            const streamId = userId + '-' + stream.id;
+            state.videoWindow.api.addStream(streamId, userName, stream);
+        });
+    }
+}
+
 
 // Removes the user card and related audio elements.
 function removeUserUI(id) {
@@ -336,7 +362,8 @@ module.exports = {
     updateDeafenStatusUI,
     addVideoElement,
     removeVideoElement,
-    openStreamModal,
+    openVideoGallery,
     updatePeerVolume,
     updateUserStatusUI
+
 };
