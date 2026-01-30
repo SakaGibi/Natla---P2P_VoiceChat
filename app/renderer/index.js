@@ -272,3 +272,21 @@ dom.btnSettings.addEventListener('click', () => {
 
 dom.btnSaveKey.addEventListener('click', () => configService.handleSaveSettings());
 dom.btnDisconnect.addEventListener('click', () => location.reload());
+
+// Image Modal Close Logic
+const imgModal = document.getElementById('imageModal');
+const closeImgModal = document.getElementById('btnCloseImageModal');
+
+if (closeImgModal) {
+    closeImgModal.addEventListener('click', () => {
+        imgModal.style.display = "none";
+    });
+}
+
+if (imgModal) {
+    imgModal.addEventListener('click', (e) => {
+        if (e.target === imgModal) {
+            imgModal.style.display = "none";
+        }
+    });
+}

@@ -14,11 +14,11 @@ function cancelTransfer(tId, isSender = true) {
 
     if (isSender) {
         const peerService = require('../webrtc/peerService');
-        peerService.broadcast({ 
-            type: 'file-cancel', 
-            payload: { tId: tId } 
+        peerService.broadcast({
+            type: 'file-cancel',
+            payload: { tId: tId }
         });
-        
+
         const statusSpan = document.querySelector(`#card-${tId} .transfer-status`);
         const cancelBtn = document.getElementById(`cancel-btn-${tId}`);
         if (statusSpan) {
@@ -34,7 +34,7 @@ function addFileSentUI(file, tId) {
     const div = document.createElement('div');
     div.id = `card-${tId}`;
     div.className = 'message sent file-message';
-    
+
     // Create HTML structure (Includes Cancel button and Progress Bar)
     div.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -52,7 +52,7 @@ function addFileSentUI(file, tId) {
     `;
 
     dom.chatHistory.appendChild(div);
-    
+
     // Add event to cancel button
     div.querySelector('.cancel-file-btn').onclick = () => cancelTransfer(tId, true);
 
@@ -65,6 +65,12 @@ function addFileSentUI(file, tId) {
             if (img && cont) {
                 img.src = e.target.result;
                 cont.style.display = 'block';
+                img.onclick = () => {
+                    const modal = document.getElementById('imageModal');
+                    const modalImg = document.getElementById('img01');
+                    modal.style.display = 'flex';
+                    modalImg.src = e.target.result;
+                }
             }
         };
         reader.readAsDataURL(file);
@@ -82,14 +88,14 @@ function sendFile(peer, file, tId) {
     let offset = 0;
 
     // Send metadata first
-    peer.send(JSON.stringify({ 
-        type: 'file-metadata', 
-        payload: { name: file.name, size: file.size, type: file.type, tId: tId } 
+    peer.send(JSON.stringify({
+        type: 'file-metadata',
+        payload: { name: file.name, size: file.size, type: file.type, tId: tId }
     }));
 
     const readAndSend = () => {
         if (state.activeTransfers[tId]?.cancelled) return;
-        
+
         // Wait if channel is busy
         if (peer._channel && peer._channel.bufferedAmount > 64 * 1024) {
             setTimeout(readAndSend, 50);
@@ -100,10 +106,10 @@ function sendFile(peer, file, tId) {
         const reader = new FileReader();
         reader.onload = (e) => {
             if (state.activeTransfers[tId]?.cancelled) return;
-            
+
             peer.send(e.target.result);
             offset += e.target.result.byteLength;
-            
+
             const bar = document.getElementById(`prog-${tId}`);
             if (bar) bar.style.width = (offset / file.size * 100) + "%";
 
@@ -112,7 +118,7 @@ function sendFile(peer, file, tId) {
             } else {
                 // Transfer completed
                 peer.send(JSON.stringify({ type: 'file-end', payload: { tId: tId } }));
-                
+
                 const audioEngine = require('../audio/audioEngine');
                 audioEngine.playSystemSound('notification');
 
@@ -155,13 +161,13 @@ function handleIncomingFileData(senderId, data) {
             state.activeIncomingTransferIds[senderId] = tId;
             state.receivingFiles[tId] = { metadata: message.payload, receivedChunks: [], receivedSize: 0 };
             displayIncomingFile(senderId, message.payload.name, message.payload.size, tId, message.payload.type);
-        } 
+        }
         else if (message.type === 'file-end') {
             const fData = state.receivingFiles[tId];
             if (fData) {
                 const blob = new Blob(fData.receivedChunks, { type: fData.metadata.type });
                 const url = URL.createObjectURL(blob);
-                
+
                 // Update image preview
                 if (fData.metadata.type?.startsWith('image/')) {
                     const imgEl = document.getElementById(`preview-img-rec-${tId}`);
@@ -169,13 +175,19 @@ function handleIncomingFileData(senderId, data) {
                     if (imgEl && contEl) {
                         imgEl.src = url;
                         contEl.style.display = 'block';
+                        imgEl.onclick = () => {
+                            const modal = document.getElementById('imageModal');
+                            const modalImg = document.getElementById('img01');
+                            modal.style.display = 'flex';
+                            modalImg.src = url;
+                        }
                     }
                 }
 
                 // Activate download link
                 const link = document.getElementById(`link-${tId}`);
                 if (link) { link.href = url; link.download = fData.metadata.name; link.style.display = 'block'; }
-                
+
                 const barCont = document.getElementById(`cont-${tId}`);
                 if (barCont) barCont.style.display = 'none';
 
@@ -187,7 +199,7 @@ function handleIncomingFileData(senderId, data) {
 
                 const audioEngine = require('../audio/audioEngine');
                 audioEngine.playSystemSound('notification');
-                
+
                 delete state.receivingFiles[tId];
                 delete state.activeIncomingTransferIds[senderId];
             }
@@ -195,7 +207,7 @@ function handleIncomingFileData(senderId, data) {
         else if (message.type === 'file-cancel') {
             const statusDiv = document.querySelector(`#card-rec-${tId} .transfer-status`);
             const senderName = state.userNames[senderId] || "Bir Kullanıcı";
-            
+
             if (statusDiv) {
                 statusDiv.innerText = `${senderName.toUpperCase()} İPTAL ETTİ ❌`;
                 statusDiv.style.color = "#ff4757";
@@ -223,7 +235,7 @@ function displayIncomingFile(senderId, fileName, fileSize, tId, fileType) {
     div.id = `card-rec-${tId}`;
     div.className = 'message received file-message';
     const name = state.userNames[senderId] || "Bir Kullanıcı";
-    
+
     div.innerHTML = `
         <div class="transfer-status" style="font-size:11px; color:#aaa; margin-bottom:8px; font-weight:bold;">${name.toUpperCase()} GÖNDERİYOR</div>
         <div id="preview-cont-rec-${tId}" class="preview-container" style="display:none;">

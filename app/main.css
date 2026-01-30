@@ -650,6 +650,16 @@ body.light-theme #btnSettings {
     justify-content: center;
 }
 
+#btnToggleCam:disabled {
+    cursor: not-allowed;
+    background-color: #555 !important;
+    opacity: 0.6;
+}
+
+#btnToggleCam:disabled:hover {
+    background-color: #555 !important;
+}
+
 #btnToggleCam:hover {
     background-color: #039be5;
 }
@@ -797,6 +807,66 @@ body.light-theme #btnSettings {
     background: var(--msg-received);
     color: var(--text-main);
     border-bottom-left-radius: 2px;
+}
+
+/* Image Modal */
+.image-modal {
+    display: none;
+    position: fixed;
+    z-index: 10001;
+    /* Higher than settings */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.9);
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.image-modal-content {
+    margin: auto;
+    display: block;
+    max-width: 90%;
+    max-height: 90%;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+.image-modal-close {
+    position: absolute;
+    top: 15px;
+    right: 35px;
+    color: #f1f1f1;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.image-modal-close:hover,
+.image-modal-close:focus {
+    color: #bbb;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Specific chat image styling to indicate clickability */
+.preview-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.preview-thumb:hover {
+    transform: scale(1.05);
 }
 
 .msg-sender {
