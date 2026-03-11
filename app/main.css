@@ -792,7 +792,8 @@ body.light-theme #btnSettings {
     padding: 8px 12px;
     border-radius: 12px;
     font-size: 13px;
-    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .message.sent {

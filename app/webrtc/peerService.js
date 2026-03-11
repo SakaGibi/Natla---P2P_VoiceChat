@@ -115,7 +115,9 @@ function createPeer(targetId, name, initiator) {
             console.error(`Peer ${targetId} hatası:`, err);
 
             if (state.peers[targetId]) {
-                chatService.addMessageToUI("Sistem", `${name} ile bağlantı koptu! (${err.message})`, 'system', new Date().toLocaleTimeString());
+                const now = new Date();
+                const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                chatService.addMessageToUI("Sistem", `${name} odadan ayrıldı.`, 'system', formattedTime);
                 audioEngine.playSystemSound('leave');
             }
         });

@@ -30,7 +30,7 @@ function createWindow() {
       contextIsolation: false,
       enableRemoteModule: true
     },
-    icon: path.join(__dirname, 'assets/gazmaliyim.ico')
+    icon: path.join(__dirname, 'assets', 'gazmaliyim.ico')
   });
 
   // Menu.setApplicationMenu(null); // Removed to restore shortcuts
@@ -41,7 +41,7 @@ function createWindow() {
   app.on('browser-window-created', (e, win) => {
     win.setMenuBarVisibility(false);
     win.setAutoHideMenuBar(true);
-    win.setIcon(path.join(__dirname, 'assets/gazmaliyim.ico'));
+    win.setIcon(path.join(__dirname, 'assets', 'gazmaliyim.ico'));
   });
 
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {

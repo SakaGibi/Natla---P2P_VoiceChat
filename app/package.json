@@ -1,6 +1,6 @@
 {
   "name": "natla",
-  "version": "3.4.2",
+  "version": "3.4.3",
   "description": "Sesli sohbet uygulaması",
   "main": "main.js",
   "repository": {
@@ -51,7 +51,7 @@
     "simple-peer": "^9.11.1"
   },
   "devDependencies": {
-    "electron": "^30.0.0",
+    "electron": "^30.5.1",
     "electron-builder": "^24.13.3"
   }
 }
