@@ -154,10 +154,12 @@ window.onload = async () => {
         const el = document.getElementById('networkStats');
         if (el) {
             const lossText = data.packetLoss !== undefined ? `Loss: %${data.packetLoss.toFixed(1)}` : 'Loss: %0.0';
+            const dlText = data.downloadRate !== undefined ? `Download: ${data.downloadRate.toFixed(1)} KB/s` : 'Download: 0 KB/s';
             // Vertical format with HTML break tags
             el.innerHTML = `
                 <div>Bitrate: ${(data.bitrate / 1000).toFixed(0)} kbps</div>
                 <div>Ping: ${data.rtt.toFixed(0)} ms</div>
+                <div>${dlText}</div>
                 <div>${lossText}</div>
                 <div>Peers: ${data.peers}</div>
             `;
