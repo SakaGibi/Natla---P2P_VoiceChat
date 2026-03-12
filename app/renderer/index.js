@@ -76,8 +76,16 @@ window.onload = async () => {
 
     // 7. Master Volume Control
     if (dom.masterSlider) {
+        const savedMasterVol = localStorage.getItem('masterVolume');
+        if (savedMasterVol !== null) {
+            dom.masterSlider.value = savedMasterVol;
+            const displayEl = document.getElementById('masterVal');
+            if (displayEl) displayEl.innerText = savedMasterVol + "%";
+        }
+
         dom.masterSlider.addEventListener('input', () => {
             const value = dom.masterSlider.value;
+            localStorage.setItem('masterVolume', value); // Save to localStorage
             const displayEl = document.getElementById('masterVal');
             if (displayEl) displayEl.innerText = value + "%";
 
@@ -93,8 +101,16 @@ window.onload = async () => {
 
     // 8. Microphone Gain
     if (dom.micSlider) {
+        const savedMicVol = localStorage.getItem('micVolume');
+        if (savedMicVol !== null) {
+            dom.micSlider.value = savedMicVol;
+            const displayEl = document.getElementById('micVal');
+            if (displayEl) displayEl.innerText = savedMicVol + "%";
+        }
+
         dom.micSlider.addEventListener('input', () => {
             const val = dom.micSlider.value;
+            localStorage.setItem('micVolume', val); // Save to localStorage
             const displayEl = document.getElementById('micVal');
             if (displayEl) displayEl.innerText = val + "%";
             if (state.micGainNode) state.micGainNode.gain.setTargetAtTime(val / 100, 0, 0.01);
