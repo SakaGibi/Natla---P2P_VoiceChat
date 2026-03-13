@@ -37,6 +37,12 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile('index.html');
 
+  // Intercept links with target="_blank" and open them in the default browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    require('electron').shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
   // Global handler for ALL windows (including popups)
   app.on('browser-window-created', (e, win) => {
     win.setMenuBarVisibility(false);
