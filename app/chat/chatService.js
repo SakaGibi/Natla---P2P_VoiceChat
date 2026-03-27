@@ -66,13 +66,16 @@ function sendChat() {
     if (text.toLowerCase() === '/help') {
         const helpText = `
             <b>Komutlar:</b><br>
-            - <b>/help:</b> Yardım
-            <br>
-            - <b>/clear:</b> Mesaj Geçmişini Temizle
+            - <b>/help:</b> Yardım<br>
+            - <b>/clear:</b> Mesaj Geçmişini Temizle<br>
             <br>
             <b>Kısayollar:</b><br>
             - <b>Ctrl+Shift+M:</b> Mikrofonu Aç/Kapat<br>
             - <b>Ctrl+Shift+N:</b> Sağırlaştır/Duy<br>
+            <br>
+            <b>Soundpad Kullanımı:</b><br>
+            - Sesi çalmak için butona <b>Sol Tıkla</b>.<br>
+            - Ses efektini değiştirmek için <b>Sağ Tıkla</b>. Ses dosyasının, dosya konumunu değiştirince ses çalmaz, konumu düzeltmen gerekir.<br>
         `;
         addMessageToUI("Yorick", helpText, 'received');
         dom.msgInput.value = '';
