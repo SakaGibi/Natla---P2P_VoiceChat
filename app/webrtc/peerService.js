@@ -49,6 +49,23 @@ function createPeer(targetId, name, initiator) {
             if (state.peers[targetId]) {
                 state.peers[targetId].send(JSON.stringify({ type: 'mic-status', isMuted: state.isMicMuted }));
                 state.peers[targetId].send(JSON.stringify({ type: 'deafen-status', isDeafened: state.isDeafened }));
+
+                // Add active screen or camera streams to the newly connected peer
+                if (state.isSharingScreen && state.screenStream) {
+                    try {
+                        state.peers[targetId].addStream(state.screenStream);
+                    } catch (err) {
+                        console.error(`Peer ${targetId} ekran akışı ekleme hatası:`, err);
+                    }
+                }
+
+                if (state.isCameraOn && state.cameraStream) {
+                    try {
+                        state.peers[targetId].addStream(state.cameraStream);
+                    } catch (err) {
+                        console.error(`Peer ${targetId} kamera akışı ekleme hatası:`, err);
+                    }
+                }
             }
         });
 
