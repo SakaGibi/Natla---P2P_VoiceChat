@@ -21,7 +21,7 @@ function createPeer(targetId, name, initiator) {
     try {
         const peer = new SimplePeer({
             initiator: initiator,
-            stream: state.processedStream,
+            streams: state.soundpadStreamDestination ? [state.processedStream, state.soundpadStreamDestination.stream] : [state.processedStream],
             trickle: true,
             config: {
                 iceServers: [
@@ -49,6 +49,12 @@ function createPeer(targetId, name, initiator) {
             if (state.peers[targetId]) {
                 state.peers[targetId].send(JSON.stringify({ type: 'mic-status', isMuted: state.isMicMuted }));
                 state.peers[targetId].send(JSON.stringify({ type: 'deafen-status', isDeafened: state.isDeafened }));
+
+                if (state.soundpadStreamDestination) {
+                    const micId = state.processedStream.getAudioTracks()[0]?.id;
+                    const spId = state.soundpadStreamDestination.stream.getAudioTracks()[0]?.id;
+                    state.peers[targetId].send(JSON.stringify({ type: 'stream-map', micId: micId, soundpadId: spId }));
+                }
 
                 // Add active screen or camera streams to the newly connected peer
                 if (state.isSharingScreen && state.screenStream) {
@@ -79,18 +85,13 @@ function createPeer(targetId, name, initiator) {
                 // video stream (cam or screen)
                 userList.addVideoElement(targetId, stream);
             } else {
-                // microphone audio stream
-                const visualizer = require('../audio/visualizer');
+                // microphone or soundpad audio stream
+                if (!state.pendingAudioStreams) state.pendingAudioStreams = {};
+                if (!state.pendingAudioStreams[targetId]) state.pendingAudioStreams[targetId] = [];
+                state.pendingAudioStreams[targetId].push(stream);
+                
                 const audioEngine = require('../audio/audioEngine');
-
-                // 1. Output audio to speaker
-                audioEngine.addAudioElement(targetId, stream);
-
-                // 2. Create or update UI card
-                userList.addUserUI(targetId, state.userNames[targetId] || "Biri", true);
-
-                // 3. Attach visualizer to stream
-                visualizer.attachVisualizer(stream, targetId);
+                audioEngine.tryProcessPendingStreams(targetId);
             }
         });
 
@@ -113,6 +114,12 @@ function createPeer(targetId, name, initiator) {
                 }
                 else if (msg.type === 'deafen-status') {
                     userList.updateDeafenStatusUI(targetId, msg.isDeafened);
+                }
+                else if (msg.type === 'stream-map') {
+                    if (!state.streamTrackMap) state.streamTrackMap = {};
+                    state.streamTrackMap[targetId] = { micId: msg.micId, soundpadId: msg.soundpadId };
+                    const audioEngine = require('../audio/audioEngine');
+                    audioEngine.tryProcessPendingStreams(targetId);
                 }
                 else if (msg.type === 'sound-effect') {
                     audioEngine.playLocalSound(msg.effectName);

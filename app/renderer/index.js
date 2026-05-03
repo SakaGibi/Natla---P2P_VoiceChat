@@ -41,6 +41,21 @@ window.onload = async () => {
         const version = await ipcRenderer.invoke('get-app-version');
         state.currentAppVersion = version;
         if (dom.updateStatus) dom.updateStatus.innerText = "Sürüm: " + version;
+        
+        // Show Changelog Modal on First Launch of New Version
+        const seenKey = 'seenUpdate_' + version;
+        if (!localStorage.getItem(seenKey) && dom.changelogModal) {
+            dom.changelogModal.style.display = 'flex';
+            
+            const closeChangelog = () => {
+                dom.changelogModal.style.display = 'none';
+                localStorage.setItem(seenKey, 'true');
+            };
+            
+            if (dom.btnCloseChangelog) dom.btnCloseChangelog.onclick = closeChangelog;
+            if (dom.btnGotItChangelog) dom.btnGotItChangelog.onclick = closeChangelog;
+        }
+        
     } catch (err) {
         if (dom.updateStatus) dom.updateStatus.innerText = "Sürüm bilgisi alınamadı";
     }
@@ -89,11 +104,47 @@ window.onload = async () => {
             const displayEl = document.getElementById('masterVal');
             if (displayEl) displayEl.innerText = value + "%";
 
+            // Update Mic gains
             for (let id in state.peerGainNodes) {
                 const gainNode = state.peerGainNodes[id];
                 const peerVol = (state.peerVolumes[id] || 100) / 100;
                 if (gainNode && state.outputAudioContext) {
                     gainNode.gain.setTargetAtTime((value / 100) * peerVol, state.outputAudioContext.currentTime, 0.01);
+                }
+            }
+            
+            // Update Soundpad gains
+            const spVol = dom.soundpadSlider ? (dom.soundpadSlider.value / 100) : 1.0;
+            for (let id in state.peerSoundpadGainNodes) {
+                const spGainNode = state.peerSoundpadGainNodes[id];
+                if (spGainNode && state.outputAudioContext) {
+                    spGainNode.gain.setTargetAtTime((value / 100) * spVol, state.outputAudioContext.currentTime, 0.01);
+                }
+            }
+        });
+    }
+    
+    // 7.1 Soundpad Volume Control
+    if (dom.soundpadSlider) {
+        const savedSpVol = localStorage.getItem('soundpadVolume');
+        if (savedSpVol !== null) {
+            dom.soundpadSlider.value = savedSpVol;
+            const displayEl = document.getElementById('soundpadVal');
+            if (displayEl) displayEl.innerText = savedSpVol + "%";
+        }
+
+        dom.soundpadSlider.addEventListener('input', () => {
+            const value = dom.soundpadSlider.value;
+            localStorage.setItem('soundpadVolume', value);
+            const displayEl = document.getElementById('soundpadVal');
+            if (displayEl) displayEl.innerText = value + "%";
+            
+            const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
+            
+            for (let id in state.peerSoundpadGainNodes) {
+                const spGainNode = state.peerSoundpadGainNodes[id];
+                if (spGainNode && state.outputAudioContext) {
+                    spGainNode.gain.setTargetAtTime(masterVol * (value / 100), state.outputAudioContext.currentTime, 0.01);
                 }
             }
         });

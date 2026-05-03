@@ -47,25 +47,35 @@ function playLocalSound(effectName, isCustomPath = false) {
             soundPath = getAssetPath(fileName);
         }
         const audio = new Audio(soundPath);
-        // [FIX]: Cap volume at 1.0 (HTMLMediaElement limit)
-        const rawVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
-        audio.volume = Math.min(1.0, rawVol);
 
         if (dom.speakerSelect && dom.speakerSelect.value && typeof audio.setSinkId === 'function') {
             audio.setSinkId(dom.speakerSelect.value).catch(e => { });
         }
 
-        if (state.audioContext && state.streamDestination) {
+        if (state.audioContext && state.soundpadStreamDestination) {
             try {
                 const source = state.audioContext.createMediaElementSource(audio);
-                const gain = state.audioContext.createGain();
-                gain.gain.value = 1.0;
-                source.connect(gain);
-                gain.connect(state.streamDestination);
-                source.connect(state.audioContext.destination);
+
+                const webrtcGain = state.audioContext.createGain();
+                webrtcGain.gain.value = 1.0;
+                source.connect(webrtcGain);
+                webrtcGain.connect(state.soundpadStreamDestination);
+
+                const localGain = state.audioContext.createGain();
+                const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
+                const spVol = dom.soundpadSlider ? (dom.soundpadSlider.value / 100) : 1.0;
+                localGain.gain.value = masterVol * spVol;
+
+                source.connect(localGain);
+                localGain.connect(state.audioContext.destination);
+
             } catch (err) {
                 console.error("Audio mixing error:", err);
             }
+        } else {
+            const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
+            const spVol = dom.soundpadSlider ? (dom.soundpadSlider.value / 100) : 1.0;
+            audio.volume = Math.min(1.0, masterVol * spVol);
         }
         audio.play().catch(e => console.error("Play error:", e));
     } catch (e) {
@@ -108,6 +118,9 @@ async function initLocalStream(deviceId = null) {
         const destination = state.audioContext.createMediaStreamDestination();
         state.streamDestination = destination;
 
+        const spDestination = state.audioContext.createMediaStreamDestination();
+        state.soundpadStreamDestination = spDestination;
+
         source.connect(gainNode);
         gainNode.connect(destination);
 
@@ -121,11 +134,12 @@ async function initLocalStream(deviceId = null) {
 }
 
 // --- ADD REMOTE USER AUDIO ---
-function addAudioElement(id, stream) {
-    let audioEl = document.getElementById(`audio-${id}`);
+function addAudioElement(id, stream, streamType = 'mic') {
+    const elId = streamType === 'mic' ? `audio-${id}` : `audio-sp-${id}`;
+    let audioEl = document.getElementById(elId);
     if (!audioEl) {
         audioEl = document.createElement('audio');
-        audioEl.id = `audio-${id}`;
+        audioEl.id = elId;
         audioEl.autoplay = true;
         document.body.appendChild(audioEl);
     }
@@ -154,10 +168,21 @@ function addAudioElement(id, stream) {
         gainNode.connect(destination);
 
         const masterVol = dom.masterSlider ? (dom.masterSlider.value / 100) : 1.0;
-        const peerVol = (state.peerVolumes && state.peerVolumes[id]) ? (state.peerVolumes[id] / 100) : 1.0;
-        gainNode.gain.value = state.isDeafened ? 0 : (masterVol * peerVol);
+        let targetVol = 1.0;
 
-        state.peerGainNodes[id] = gainNode;
+        if (streamType === 'mic') {
+            const peerVol = (state.peerVolumes && state.peerVolumes[id]) ? (state.peerVolumes[id] / 100) : 1.0;
+            targetVol = masterVol * peerVol;
+            state.peerGainNodes[id] = gainNode;
+        } else {
+            const spVol = dom.soundpadSlider ? (dom.soundpadSlider.value / 100) : 1.0;
+            targetVol = masterVol * spVol;
+            if (!state.peerSoundpadGainNodes) state.peerSoundpadGainNodes = {};
+            state.peerSoundpadGainNodes[id] = gainNode;
+        }
+
+        gainNode.gain.value = state.isDeafened ? 0 : targetVol;
+
         audioEl.srcObject = destination.stream;
         audioEl.volume = 1.0;
 
@@ -171,6 +196,48 @@ function addAudioElement(id, stream) {
     }
 }
 
+function tryProcessPendingStreams(targetId) {
+    if (!state.pendingAudioStreams || !state.pendingAudioStreams[targetId]) return;
+
+    const streams = state.pendingAudioStreams[targetId];
+    const map = (state.streamTrackMap && state.streamTrackMap[targetId]) || {};
+
+    for (let i = streams.length - 1; i >= 0; i--) {
+        const stream = streams[i];
+        const trackId = stream.getAudioTracks()[0]?.id;
+
+        if (map.micId && (trackId === map.micId || stream.id === map.micId)) {
+            // Process as Mic
+            addAudioElement(targetId, stream, 'mic');
+            const visualizer = require('./visualizer');
+            visualizer.attachVisualizer(stream, targetId);
+
+            const userList = require('../ui/userList');
+            userList.addUserUI(targetId, state.userNames[targetId] || "Biri", true);
+
+            streams.splice(i, 1);
+        } else if (map.soundpadId && (trackId === map.soundpadId || stream.id === map.soundpadId)) {
+            // Process as Soundpad
+            addAudioElement(targetId, stream, 'soundpad');
+            streams.splice(i, 1);
+        } else {
+            console.warn("Track ID mismatch, using fallback assignment.");
+            if (state.peerGainNodes[targetId]) {
+                // Mic already exists, so this must be soundpad
+                addAudioElement(targetId, stream, 'soundpad');
+            } else {
+                // First stream is mic
+                addAudioElement(targetId, stream, 'mic');
+                const visualizer = require('./visualizer');
+                visualizer.attachVisualizer(stream, targetId);
+                const userList = require('../ui/userList');
+                userList.addUserUI(targetId, state.userNames[targetId] || "Biri", true);
+            }
+            streams.splice(i, 1);
+        }
+    }
+}
+
 function removeAudioElement(id) {
     const el = document.getElementById(`audio-${id}`);
     if (el) {
@@ -178,7 +245,14 @@ function removeAudioElement(id) {
         el.srcObject = null;
         el.remove();
     }
+    const spEl = document.getElementById(`audio-sp-${id}`);
+    if (spEl) {
+        if (spEl._anchor) { spEl._anchor.srcObject = null; spEl._anchor = null; }
+        spEl.srcObject = null;
+        spEl.remove();
+    }
     if (state.peerGainNodes[id]) delete state.peerGainNodes[id];
+    if (state.peerSoundpadGainNodes && state.peerSoundpadGainNodes[id]) delete state.peerSoundpadGainNodes[id];
 }
 
 async function setAudioOutputDevice(deviceId) {
@@ -270,5 +344,6 @@ module.exports = {
     setAudioOutputDevice,
     setMicState,
     toggleDeafen,
-    nudgeAllPeers
+    nudgeAllPeers,
+    tryProcessPendingStreams
 };

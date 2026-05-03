@@ -45,6 +45,7 @@ const dom = {
     // Volume Sliders
     micSlider: document.getElementById('micVolume'),
     masterSlider: document.getElementById('masterVolume'),
+    soundpadSlider: document.getElementById('soundpadVolume'),
 
     // Update Buttons
     btnCheckUpdate: document.getElementById('btnCheckUpdate'),
@@ -71,6 +72,11 @@ const dom = {
     btnSoundpadCancel: document.getElementById('btnSoundpadCancel'),
     btnSelectSoundFile: document.getElementById('btnSelectSoundFile'),
     selectedFileName: document.getElementById('selectedFileName'),
+    
+    // Changelog Modal
+    changelogModal: document.getElementById('changelogModal'),
+    btnCloseChangelog: document.getElementById('btnCloseChangelog'),
+    btnGotItChangelog: document.getElementById('btnGotItChangelog'),
 };
 
 module.exports = dom;

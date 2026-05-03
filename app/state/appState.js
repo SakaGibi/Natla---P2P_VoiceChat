@@ -31,10 +31,15 @@ module.exports = {
 
     audioContext: null, // Input audio processing context
     outputAudioContext: null, // Output audio processing context
-    streamDestination: null, // WebRTC stream destination node (for mixing soundpad)
+    streamDestination: null, // WebRTC stream destination node (for mic)
+    soundpadStreamDestination: null, // WebRTC stream destination node for soundpad
 
     micGainNode: null, // Own mic volume (Gain) node
-    peerGainNodes: {}, // Peer volume nodes
+    peerGainNodes: {}, // Peer volume nodes (Mic)
+    peerSoundpadGainNodes: {}, // Peer volume nodes (Soundpad)
+    
+    streamTrackMap: {}, // Maps peerId to their stream track IDs {micId, soundpadId}
+    pendingAudioStreams: {}, // Stores audio streams until stream-map arrives
 
     // Critical Data Objects (Error Fix)
     // Prevents "Cannot set properties of undefined" errors if not initialized.
