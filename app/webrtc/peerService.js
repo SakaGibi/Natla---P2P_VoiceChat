@@ -131,19 +131,42 @@ function createPeer(targetId, name, initiator) {
             }
         });
 
+        // Track ICE Connection State for Reconnection
+        if (peer._pc) {
+            peer._pc.addEventListener('iceconnectionstatechange', () => {
+                const iceState = peer._pc.iceConnectionState;
+                console.log(`Peer ${targetId} ICE state changed to ${iceState}`);
+                if (iceState === 'disconnected' || iceState === 'failed') {
+                    console.log(`Peer ${targetId} bağlantısı koptu, yeniden başlatılıyor...`);
+                    // If it drops, destroy the current peer to trigger the close event
+                    peer.destroy();
+                }
+            });
+        }
+
         // Handle Clean Close
-        peer.on('close', () => removePeer(targetId));
+        peer.on('close', () => {
+            removePeer(targetId);
+            
+            // Reconnection attempt if the user is still in the room
+            setTimeout(() => {
+                const isTargetInRoom = state.allUsers && state.allUsers.some(u => u.id === targetId);
+                if (state.isConnected && isTargetInRoom && !state.peers[targetId]) {
+                    console.log(`Peer ${targetId} hala odada, yeniden bağlanılıyor...`);
+                    const myIdStr = String(state.myPeerId);
+                    const targetIdStr = String(targetId);
+                    if (myIdStr > targetIdStr) {
+                         createPeer(targetId, name, true);
+                    }
+                }
+            }, 2000);
+        });
 
         // Handle Errors (Connection Failed etc.)
         peer.on('error', err => {
             console.error(`Peer ${targetId} hatası:`, err);
-
-            if (state.peers[targetId]) {
-                const now = new Date();
-                const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                chatService.addMessageToUI("Sistem", `${name} odadan ayrıldı.`, 'system', formattedTime);
-                audioEngine.playSystemSound('leave');
-            }
+            // Just destroy on error so 'close' logic can attempt reconnect
+            peer.destroy();
         });
 
         state.peers[targetId] = peer;

@@ -130,9 +130,15 @@ function handleMessage(data) {
                 return;
             }
 
+            if (!state.allUsers) state.allUsers = [];
+            state.allUsers.push({ id: data.id, name: data.name, avatar: data.avatar });
+
             state.userNames[data.id] = data.name;
             userList.addUserUI(data.id, data.name, false, data.avatar);
             audioEngine.playSystemSound('join');
+            
+            const joinTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            chatService.addMessageToUI("Sistem", `${data.name} odaya katıldı.`, 'system', joinTime);
 
             if (!state.peers[data.id] && shouldIInitiate(state.myPeerId, data.id)) {
                 peerService.createPeer(data.id, data.name, true, data.avatar);
@@ -141,6 +147,14 @@ function handleMessage(data) {
 
         case 'user-left':
             // Removing is safe even if different room (it just won't be found)
+            if (state.allUsers) {
+                state.allUsers = state.allUsers.filter(u => u.id !== data.id);
+            }
+            
+            const leftName = state.userNames[data.id] || "Bir kullanıcı";
+            const leftTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            chatService.addMessageToUI("Sistem", `${leftName} odadan ayrıldı.`, 'system', leftTime);
+
             audioEngine.playSystemSound('leave');
             peerService.removePeer(data.id);
             break;
